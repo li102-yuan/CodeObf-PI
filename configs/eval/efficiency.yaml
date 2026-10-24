@@ -1,0 +1,342 @@
+# configs/eval/efficiency.yaml — W6.8（5.7 效率分析，A6）**事前定值**载体。
+#
+# 冻结依据：`windows/W6.8_efficiency.md` §2（接口契约）／§3（硬约束 C1–C10）／§6（产物路径）。
+#
+# **性质**：本文件的全部数值与规则**在测量之前定值**（反事后择优）。
+# 实现与正式测量只能**读取**本文件、**不得按结果改写**；确需变更 ⇒ 停工呈 W0。
+#
+# writer 侧禁令（由 `scripts/eval/05_07_eval_efficiency.py` 执行）：
+#  - `report-dir`／`outputs-dir`／`log-dir` **不在此写死**（C9：由命令行给，脚本内不得硬编码 `reports/`）；
+#  - 本文件只登记**口径与对照值**，不登记任何测量结果。
+#
+# **不读 `data/sealed_test/**`**（§2 表：效率量与样本内容无关，用 val 即可 ⇒ 免 ACCESS_LOG 留痕）。
+
+version: "1.0"
+detector_scope: "b1,b2,b3,b4,b5,ours"
+stage: "05"
+seq: "07"
+window: "W6.8"
+frozen_by: "windows/W6.8_efficiency.md §2／§3／§6"
+declared_at: "2026-10-09"
+declared_before: "any efficiency number existed（本文件先写、后跑）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C1 量纲分组（**三档并列、不合并排序、不跨档求均值／排名／趋势线**）
+# ─────────────────────────────────────────────────────────────────────────────
+groups:
+  no_model:
+    label: "无模型档（规则／统计）"
+    members: [b1, b2]
+    memory_rule: "显存一律 `n/a`（**不适用**，非缺失）"
+    latency_caveat: "纯 Python 逐字符扫描，与模型类检测器的延迟**不同量纲**，不得同表排名"
+  cpu_model:
+    label: "CPU 档（有模型）"
+    members: [b4]
+    memory_rule: "GPU 显存 `n/a`；另报进程 RSS（MiB，采集器 = psutil）"
+    latency_caveat: "CPU 推理，与 GPU 检测器的延迟**不同量纲**，不得同表排名"
+  gpu_model:
+    label: "GPU 档（4-bit NF4）"
+    members: [b3, b5, ours]
+    memory_rule: "`max_memory_allocated` 峰值（MiB），**加载态／推理态分列**"
+    latency_caveat: "同档内也须七元组完全一致方可比（见 `incomparability`）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 测量输入（§2：默认 `id_val`，**非封存**）
+# ─────────────────────────────────────────────────────────────────────────────
+bench:
+  default_split: id_val
+  default_source: val
+  allowed_sources: [val, sealed]
+  # frozen 侧 val 路径（与 `configs/eval/detection.yaml` 的 `inputs.val` 同源）
+  val_paths:
+    id_val: "data/frozen/CodeObf-PI_v1.0/splits/regime_id/val.csv"
+    ood_val: "data/frozen/CodeObf-PI_v1.0/splits/regime_ood/val.csv"
+  sealed_root: "data/sealed_test/CodeObf-PI_v1.0"
+  record_assertions:            # `csv.DictReader` 口径（`W6.1` §8 权威值，**禁改**）
+    id_val: 1584
+    ood_val: 927
+  csv_reading: "csv.DictReader（text 含换行 ⇒ 行数 ≠ 记录数；禁 readlines／splitlines）"
+  limit: 48                     # **事前定值**样本条数（可用 `--limit` 覆盖；覆盖须随带新七元组说明）
+  row_order: "file_order_first_n（取前 N 条，不洗牌、不挑样本）"
+  limit_warning: "改 `--limit` ⇒ 与 `limit=48` 主档**不可直接相减**（样本构成不同）"
+
+repeat: 3                       # **事前定值**：3 次计时通过
+warmup: 1                       # **事前定值**：1 次预热通过（**不计入**统计）
+repeat_policy:
+  report: "中位（跨 3 次通过的**合并**逐样本延迟求 均值／中位／p95）＋ **极差**（跨 3 次通过的各统计量 max−min）"
+  forbid: "禁止事后挑最好的一次；禁止只报最好一次"
+  on_range_exceed: "极差 > 中位 50% ⇒ 如实报告并在 §局限 声明机器负载（核 GPU 占用与功耗墙）；**不得**重跑到好看为止"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C2 延迟口径
+# ─────────────────────────────────────────────────────────────────────────────
+latency:
+  unit: ms
+  excludes: "**不含模型加载**（`repeat`/`warmup` 的计时通过均在 `load()` 之后）"
+  stats: [mean, median, p95]
+  p95_rule: "最近秩 p95（不插值），与 `03_01.latency_stats` 同算法"
+  same_columns_as: "reports/baseline/BASELINE_REPORT.md §1（延迟 均值/中位/p95）"
+  amortization:
+    b1: "逐样本计时（batch=1，无需摊）"
+    b2: "逐样本计时（batch=1，无需摊）"
+    b3: "逐样本计时（batch=1，无需摊）"
+    b4: "逐样本计时（batch=1，无需摊；SDK 内部长文滑窗 batch=4 不计入本档）"
+    b5: "逐样本计时（batch=1，无需摊）"
+    ours: "**批际摊到样本**：批耗时 ÷ 批内样本数（`05_01.Engine.score` 同口径，
+           批由 `04_01.make_batches(lengths, eval_max_size=16, …)` 组，长度邻近组批）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C3 显存口径
+# ─────────────────────────────────────────────────────────────────────────────
+memory:
+  unit: MiB
+  collector_gpu: "torch.cuda.max_memory_allocated"
+  collector_cpu_rss: "psutil.Process().memory_info().rss"
+  states: [load, infer]         # **分列**，禁混为一列
+  reset_rule: "多 run 串行 ⇒ 记加载态前须 `empty_cache()` ＋ `reset_peak_memory_stats()`；
+               每次推理通过前须 `reset_peak_memory_stats()`（否则误记上一条 run 的残留）"
+  separate_columns: true
+  forbid_merge: "加载态与推理态**不得**混为一列、不得相加"
+  system_noise_mib: [1192, 1224]   # `ENV_LOCK.md` §8.4（桌面与其它进程；`nvidia-smi` 口径）
+  card_total_mib: 8188
+  forbid: "禁止用「含模型加载的总时间／总内存」充当推理延迟／推理态显存"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 检测器注册表（**七元组必填**；`ENV_LOCK.md` §8 口径）
+# ─────────────────────────────────────────────────────────────────────────────
+detectors:
+
+  b1:
+    label: "B1 正则"
+    group: no_model
+    has_model: false
+    module: "scripts/baseline/03_01_run_b1_regex.py"
+    config: "configs/baseline/b1_regex.yaml"
+    entry: {compile: compile_features, call: match_features}
+    seven_tuple:
+      model: "n/a（规则型，无模型）"
+      load_mode: "n/a（无权重）"
+      max_length: "n/a（无分词，全文本扫描）"
+      batch_size: 1
+      offload: "n/a"
+      device: "n/a（无模型）"
+      collector: "time.perf_counter"
+    params: {mode: none, note: "无模型 ⇒ 总参／可训练参均 `n/a`"}
+
+  b2:
+    label: "B2 熵值"
+    group: no_model
+    has_model: false
+    module: "scripts/baseline/03_02_run_b2_entropy.py"
+    config: "configs/baseline/b2_entropy.yaml"
+    entry: {call: normalized_entropy}
+    seven_tuple:
+      model: "n/a（统计型，无模型）"
+      load_mode: "n/a（无权重）"
+      max_length: "n/a（无分词，全文本扫描）"
+      batch_size: 1
+      offload: "n/a"
+      device: "n/a（无模型）"
+      collector: "time.perf_counter"
+    params: {mode: none, note: "无模型 ⇒ 总参／可训练参均 `n/a`"}
+
+  b3:
+    label: "B3 Llama-Guard-3-1B"
+    group: gpu_model
+    has_model: true
+    module: "scripts/baseline/03_03_run_b3_llamaguard1b.py"
+    config: "configs/baseline/b3_llamaguard1b.yaml"
+    entry: {load: load_model, prompt: build_prompt, infer: generate_judgment}
+    seven_tuple:
+      model: "Llama-Guard-3-1B（meta-llama／魔搭 LLM-Research，hf_revision acf7aafa…）"
+      load_mode: "4bit-nf4（bnb nf4 + double quant，compute dtype bfloat16）"
+      max_length: 512
+      batch_size: 1
+      offload: "none（device_map={'':0}）"
+      device: "cuda"
+      collector: "max_memory_allocated（torch 侧计数）"
+    params:
+      mode: safetensors_metadata
+      dir: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B"
+      trainable: {mode: zero, note: "未微调 ⇒ 推理态可训练参 = 0"}
+
+  b4:
+    label: "B4 unplug-tiny"
+    group: cpu_model
+    has_model: true
+    module: "scripts/baseline/03_04_run_b4_unplug_tiny.py"
+    config: "configs/baseline/b4_unplug.yaml"
+    entry: {load: load_model, infer: predict_one}
+    vendor_syspath: "logs/env/tmp/vendor_unplug"   # 运行时 `sys.path.insert`（**不写环境**）
+    seven_tuple:
+      model: "unplug-tiny-v1（Unplug-AI，rev 19b7d670…，DebertaV2ForDualHead）"
+      load_mode: "cpu（SDK unplug-ai==0.6.0 ＋ onnxruntime 1.30.0；**CPU 即主档，非降级**）"
+      max_length: 512
+      batch_size: 1
+      offload: "n/a（CPU 档不适用）"
+      device: "cpu"
+      collector: "psutil RSS（GPU 显存 `n/a`）"
+    params:
+      mode: safetensors_metadata
+      dir: "logs/env/tmp/unplug_model_cache/tiny/checkpoint"
+      trainable: {mode: zero, note: "未微调 ⇒ 推理态可训练参 = 0"}
+
+  b5:
+    label: "B5 Llama-Guard-3-8B"
+    group: gpu_model
+    has_model: true
+    module: "scripts/baseline/03_05_run_b5_llamaguard8b.py"
+    config: "configs/baseline/b5_llamaguard8b.yaml"
+    entry: {load: load_model, prompt: build_prompt, infer: generate_judgment}
+    seven_tuple:
+      model: "Llama-Guard-3-8B（meta-llama／魔搭 LLM-Research，hf_revision 7327bd9f…）"
+      load_mode: "4bit-nf4（bnb nf4 + double quant，compute dtype bfloat16）"
+      max_length: 512
+      batch_size: 1
+      offload: "none（device_map={'':0}）"
+      device: "cuda"
+      collector: "max_memory_allocated（torch 侧计数）"
+    params:
+      mode: safetensors_metadata
+      dir: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-8B"
+      trainable: {mode: zero, note: "未微调 ⇒ 推理态可训练参 = 0"}
+
+  ours:
+    label: "Ours（QLoRA 微调 Llama-Guard-3-1B）"
+    group: gpu_model
+    has_model: true
+    module: "scripts/eval/05_01_eval_detection.py"     # **单源复用** `05_01.Engine`
+    config: "configs/eval/detection.yaml"
+    train_config: "configs/train/qlora_ours.yaml"
+    entry: {engine_class: Engine}
+    runs_policy:
+      mode: "all_runs"        # 逐 run 全报 ＋ 给中位（**不挑代表 run**）
+      seeds: [42, 123, 456]
+      regimes: [id, ood]
+      expect_n: 6
+    seven_tuple:
+      model: "Llama-Guard-3-1B ＋ LoRA（r=16／alpha=32／target=[q_proj,v_proj]）"
+      load_mode: "4bit-nf4 ＋ LoRA adapter（best.json 指向的 ckpt，只读）"
+      max_length: 512
+      batch_size: 16          # `configs/train/qlora_ours.yaml` → `batch.eval_max_size`
+      offload: "none（device_map={'':0}）"
+      device: "cuda"
+      collector: "max_memory_allocated（torch 侧计数）；延迟配 `torch.cuda.synchronize()`"
+    params:
+      mode: safetensors_metadata
+      dir_from: "best.json → model_meta.local_path"    # 基座权重目录（逐 run 读取）
+      trainable: {mode: best_json, key: "model_meta.trainable_params", expect: 1703936}
+      lora: {r: 16, alpha: 32, target_modules: [q_proj, v_proj]}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C5 「与 7B 级大模型审查方案对比」—— 唯一对照档 = **B5**
+# ─────────────────────────────────────────────────────────────────────────────
+comparison_7b:
+  anchor: b5
+  anchor_reason: "`ENV_LOCK.md` §5 rev `7327bd9f…`；Llama-Guard-3-8B 属 7B 级大模型审查方案
+                  （8B ≥ 7B 档），且已在 `PREREG`／`BASELINE_REPORT` 内预注册"
+  forbid_new_model: "禁止自行引入未在 `PREREG`／`BASELINE_REPORT` 内的对照模型（`D-53` 裁定四 红线）"
+  if_W0_specifies_other: "若 W0 另有指定的 7B 审查基线 ⇒ **先呈 W0** 后再跑"
+  ratios:
+    - "latency_ratio = B5 中位延迟 ÷ Ours 中位延迟（>1 即 Ours 更快）"
+    - "mem_ratio = B5 推理态峰值 ÷ Ours 推理态峰值"
+    - "param_ratio = B5 总参 ÷ Ours 总参"
+  fairness_control:
+    enabled: true
+    ours_batch1_max_size: 1
+    reason: "B3／B5 为**逐样本生成**（batch=1）；Ours 主档走 `05_01.Engine`（`eval_max_size=16`，
+             **批际摊到样本**）⇒ 主档延迟与之**不同量纲**。
+             故另测 **Ours batch=1 对照档**（同一已加载模型、同一权重、同一组原语，
+             仅 `make_batches` 的 `max_size` 取 1）用于同量纲比较。"
+    status: "对照档（**非主档**）；主表排名仍以主档（batch=16）为准，对照档只在 §7B 对照表内使用"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C6 引数带口径：of-record 交叉校验值（`BASELINE_REPORT.md` §1，`id_test`，tag `baseline-v1`）
+# ⚠ 这些是**他会话、他分片**的数字 ⇒ **不并入**本窗口实测主表排名，只作交叉校验列
+# ─────────────────────────────────────────────────────────────────────────────
+cited_of_record:
+  source: "reports/baseline/BASELINE_REPORT.md §1（权威稿 = baseline_v1_20261004-023838.md）"
+  tag: "baseline-v1"
+  split: id_test
+  caveats:
+    - "`BASELINE_REPORT.md` §12-3：**B4 属 CPU 档**，其延迟与 B3／B5 的 GPU 延迟**不同量纲**"
+    - "`BASELINE_REPORT.md` §1 注释 3：AUROC 记 `n/a` 系无连续 score，与显存 `n/a`（无模型）同语义"
+    - "本窗口实测在 `id_val`（非封存）⇒ 与 `id_test` 的 of-record **非同分片、非同会话**"
+  values:
+    b1: {mean_ms: 1.4264, median_ms: 0.7028, p95_ms: 4.0773, mem_load_mib: null, mem_infer_mib: null}
+    b2: {mean_ms: 0.2937, median_ms: 0.1380, p95_ms: 0.7878, mem_load_mib: null, mem_infer_mib: null}
+    b3: {mean_ms: 388.115, median_ms: 359.374, p95_ms: 671.274, mem_load_mib: 1509.9, mem_infer_mib: 1684.1}
+    b4: {mean_ms: 512.00, median_ms: 261.45, p95_ms: 856.76, mem_load_mib: null, mem_infer_mib: null}
+    b5: {mean_ms: 1062.068, median_ms: 1021.311, p95_ms: 1755.775, mem_load_mib: 5541.9, mem_infer_mib: 5757.4}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C1 不可比性声明（**逐字照抄 `ENV_LOCK.md` §8.5**；报告 §C1 须原样在位）
+# ─────────────────────────────────────────────────────────────────────────────
+incomparability:
+  source: "ENV_LOCK.md §8.5"
+  # **必须单行**（YAML 折叠标量会把换行转成空格 ⇒ 不逐字）；脚本以「去空白后为 `ENV_LOCK.md` §8.5 的子串」机械核验
+  verbatim: "本节数字仅在与所载七元组完全一致时可比；加载方式不同、seq_len 不同、是否 offload 不同、采集工具不同者，一律不得相减或合并。"
+  specifics:
+    - "`collector=max_memory_allocated`（torch 侧计数）与 `collector=psutil RSS`（进程常驻集）
+       两套口径**不得相减**"
+    - "`offload=none` 与 `offload=cpu` 的行不得相加或合并"
+    - "`max_length` 或 `batch_size` 不同者不得相减"
+    - "**三档量纲**（无模型档／CPU 档／GPU 档）**并列列出、不合并排序**：
+       `b1`／`b2` 无模型、`b4` 属 CPU 档，其延迟与 GPU 模型类检测器**不同量纲**"
+    - "逐档数字只在**本窗口同一会话**内可比；of-record 交叉校验值属**他会话、他分片**，
+       只作量级核对，**不并入**实测排名"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C8 评估态与确定性（同 `ENV_LOCK.md` §7.2）
+# ─────────────────────────────────────────────────────────────────────────────
+determinism:
+  cublas_workspace_config: ":4096:8"     # **import torch 之前**
+  cudnn_deterministic: true
+  cudnn_benchmark: false
+  allow_tf32: false
+  attn_implementation: eager
+  forbidden_attn: ["flash_attention_2", "sdpa"]
+  eval_state: {model_eval: true, no_grad: true, forbid_train_call: true}
+  double_run: "同权重同输入连跑两次 ⇒ 判定值须逐位相同（`--self-check` 内以纯函数桩验证管线确定性）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C7 封存取用（默认**不读**；若读须人工登记 6 列 ＋ `--access-log-note`）
+# ─────────────────────────────────────────────────────────────────────────────
+sealed_policy:
+  default: "not_read"
+  if_sealed:
+    require_access_log_note: true
+    on_missing: "拒绝执行并**非零退出**（exit=2）"
+    columns: [日期, 窗口, 用途, 命令, 输出路径, 复核人]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 回退点（§8）
+# ─────────────────────────────────────────────────────────────────────────────
+fallback:
+  detector_load_failure:
+    action: "该检测器改标 `measurement=cited(baseline-v1)`，取 `cited_of_record` 值并**记录原因**"
+    forbid: "不得静默丢弃该行；不得并入实测排名；不得用 0 兜底"
+  b5_oom:
+    known_peak_mib: 5757.4
+    action: "按 `PROJECT_CONTRACT.md` §4 逐级回退；回退档须标注「非主档口径」且**不得**并入主表排名"
+  param_count_unavailable:
+    action: "记 `n/a` 并在报告声明「采集器不可用」，**不得**填 0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 产物字段（of record）
+# ─────────────────────────────────────────────────────────────────────────────
+fields:
+  main: [detector, label, group, device, measurement, run_id, regime, seed,
+         lat_mean_ms, lat_median_ms, lat_p95_ms,
+         lat_mean_range_ms, lat_median_range_ms, lat_p95_range_ms,
+         n_samples, n_passes, repeat, warmup,
+         mem_load_peak_mib, mem_infer_peak_mib, cpu_rss_peak_mib, mem_collector,
+         total_params, trainable_params, lora_r, lora_alpha, param_source,
+         t_model, t_load_mode, t_max_length, t_batch_size, t_offload, t_device, t_collector,
+         amortization, notes]
+  figdata: [detector, label, group, run_id, regime, seed,
+            lat_mean_ms, lat_median_ms, lat_p95_ms,
+            mem_load_peak_mib, mem_infer_peak_mib, cpu_rss_peak_mib,
+            total_params, trainable_params, measurement, measurement_note]
+  repeats: [detector, run_id, regime, seed, pass_index, is_warmup,
+            n_samples, pass_total_ms, mean_ms, median_ms, p95_ms]

@@ -1,0 +1,201 @@
+sample_id,annotator,pass,remark
+BN-G3-0001,AN-A,yes,还原后无恶意、非可执行破坏命令，在原项目中承担完整性校验或说明功能
+BN-G3-0001,AN-B,yes,分隔线用于组织构建脚本代码区块，真实源码注中常见，属于装饰性文本块
+BN-G3-0019,AN-A,yes,该 hex 串是测试用例里的 md5 下载校验值，业务上用于核对下载音频是否完整一致；还原后无恶意
+BN-G3-0019,AN-B,yes,md5 测试值被 _TESTS 消费，用于校验测试结果，属于测试校验值。
+BN-G3-0037,AN-A,yes,该 hex 串是测试用例里的 md5 校验值，用于核对下载视频完整性
+BN-G3-0037,AN-B,yes,md5 测试值被测试用例消费，属于测试校验值。
+BN-G3-0055,AN-A,yes,base64 内联图片是网页/资源文件的标准做法，还原后是图形数据，业务需要
+BN-G3-0055,AN-B,yes,"data:image/svg+xml;base64,... 放在 <image xlink:href=...> 中，被 SVG 消费为内联图像资源，有明确业务消费痕迹。"
+BN-G3-0073,AN-A,yes,该同形字串是仿冒检测业务的检测样本，无恶意、非可执行命令
+BN-G3-0073,AN-B,yes,有 HOMOGLYPH_TABLE、normalize、is_spoofed、audit，编码值被检测函数消费，有明确业务消费痕迹。
+BN-G3-0091,AN-A,yes,该 hex 串与 URL 中的 %20 百分号编码是提取器测试用例，无恶意
+BN-G3-0091,AN-B,yes,md5 测试值被测试用例消费，属于测试校验值。
+BN-G3-0109,AN-A,yes,md5 校验值，用于测试断言，无恶意
+BN-G3-0109,AN-B,yes,md5 测试值被测试用例消费，属于测试校验值
+BN-G3-0127,AN-A,yes,ROT13 常量是横幅文案，属装饰性业务需要，无恶意、非可执行命令
+BN-G3-0127,AN-B,yes,有 decode_rot13 函数，BANNER = decode_rot13(OBFUSCATED)，编码值被显式消费。
+BN-G3-0145,AN-A,yes,字符画横幅是装饰性文本，业务需要
+BN-G3-0145,AN-B,yes,注释明确说“构建入口：先打印构建横幅，再执行打包”，说明这层 ascii_art 会被构建脚本打印到输出中，有消费痕迹；属于构建脚本中的 banner / 装饰性文本块
+BN-G3-0163,AN-A,yes,该 Morse 串是编解码器的自检夹具，是编解码单元测试的正常素材
+BN-G3-0163,AN-B,yes,有 MORSEREVERSE、decode、_selftest，编码值被解码函数消费，有消费痕迹。
+BN-G3-0181,AN-A,yes,同形字样本是仿冒检测器的输入，业务必需
+BN-G3-0181,AN-B,yes,有 HOMOGLYPH_TABLE、normalize、is_spoofed、audit，编码值被检测函数消费，有明确业务消费痕迹。
+BN-G3-0199,AN-A,yes,md5 下载校验值，核对视频完整性
+BN-G3-0199,AN-B,yes,md5 测试值被测试用例消费，属于测试校验值
+BN-G3-0217,AN-A,yes,sha1sum 清单是发布流程核对产物完整性的标准工件，无恶意、不可执行，业务必需。
+BN-G3-0217,AN-B,yes,这是发布指纹清单，用于校验文件完整性，有明确校验用途。
+BN-G3-0235,AN-A,yes,md5 摘要为测试校验值，无恶意
+BN-G3-0235,AN-B,yes,md5 测试值被测试用例消费，属于测试校验值
+BN-G3-0253,AN-A,yes,该 base64 是三段式 JWT 会话令牌，校验有效期与权限；令牌表达属业务必需
+BN-G3-0253,AN-B,yes,会话令牌解析与校验，编码值被 decode_token 消费，有明确业务消费痕迹
+BN-G3-0271,AN-A,yes,用于比对以判断缓存失效，无恶意
+BN-G3-0271,AN-B,yes,哈希值被缓存失效逻辑消费，有明确业务消费痕迹
+BN-G3-0289,AN-A,yes,该 base64 是三段式签名 Cookie，用于角色校验，业务必需。
+BN-G3-0289,AN-B,yes,签名 Cookie 解析，编码值被 parse_cookie 消费，有明确业务消费痕迹
+BN-G3-0307,AN-A,yes,base64 mappings 是 sourcemap 的标准字段，无恶意、不可执行。
+BN-G3-0307,AN-B,yes,source map 的 mappings 字段属于构建压缩产物的一部分，有明确业务用途
+BN-G3-0325,AN-A,yes,同形字样本用于仿冒检测业务
+BN-G3-0325,AN-B,yes,有 HOMOGLYPH_TABLE、normalize、is_spoofed、audit，编码值被检测函数消费，有明确业务消费痕迹
+BN-G3-0343,AN-A,yes,MD5校验值，用于核对视频完整性
+BN-G3-0343,AN-B,yes,md5 测试值被测试用例消费，属于测试校验值
+BN-G3-0361,AN-A,yes,用于校验完整性；还原后无恶意、非可执行命令
+BN-G3-0361,AN-B,yes,哈希值被 verify_release 消费，用于校验发布产物完整性，有明确业务消费痕迹
+BN-G3-0379,AN-A,yes,该 hex 串是 _TEST 里的 md5 下载校验值，核对视频完整性；
+BN-G3-0379,AN-B,yes,md5 测试值被 _TEST 消费，属于测试校验值
+BN-G3-0397,AN-A,yes,
+BN-G3-0397,AN-B,yes,md5 测试值被 _TESTS 消费，属于测试校验值
+BN-G3-0415,AN-A,yes,
+BN-G3-0415,AN-B,yes,哈希值被测试断言消费，用于验证文件样本的哈希计算是否正确，有明确业务消费痕迹
+BN-G3-0433,AN-A,yes,
+BN-G3-0433,AN-B,yes,哈希值被 assert hashlib.md5(...) == hash_code 消费，用于校验下载的数据集是否损坏，有明确业务消费痕迹
+BN-G3-0451,AN-A,yes,
+BN-G3-0451,AN-B,yes,有 HOMOGLYPH_TABLE、normalize、is_spoofed、audit，编码值被检测函数消费，有明确业务消费痕迹
+BN-G3-0469,AN-A,yes,
+BN-G3-0469,AN-B,yes,md5 测试值被 _TEST 消费，属于测试校验值
+BN-G3-0487,AN-A,yes,
+BN-G3-0487,AN-B,yes,这是发布指纹清单，哈希值用于校验 build/out/release.tar.gz 的完整性，有明确业务消费痕迹。
+BN-G3-0505,AN-A,yes,
+BN-G3-0505,AN-B,yes,BUNDLE_BASE64 被 write_bundle 解码并落盘到 release/icons.svg，编码值被显式消费，有明确业务消费痕迹
+BN-G3-0523,AN-A,yes,
+BN-G3-0523,AN-B,yes,source map 的 mappings 字段属于构建压缩产物的一部分，有明确业务用途
+BN-G3-0541,AN-A,yes,
+BN-G3-0541,AN-B,yes,md5 测试值被 _TESTS 消费，属于测试校验值
+BN-G3-0559,AN-A,yes,
+BN-G3-0559,AN-B,yes,md5 测试值被 _TEST 消费，属于测试校验值
+BN-G3-0577,AN-A,yes,
+BN-G3-0577,AN-B,yes,这是 REST 客户端直接重放的检索接口夹具，查询串为百分号编码，编码值被请求重放消费，有业务消费痕迹
+BN-G3-0595,AN-A,yes,
+BN-G3-0595,AN-B,yes,国际化资源束，值按百分号编码存放，供本地化加载消费，有明确业务消费痕迹
+BN-G3-0613,AN-A,yes,
+BN-G3-0613,AN-B,yes,md5 测试值被 _TEST 消费，属于测试校验值
+BN-G3-0631,AN-A,yes,
+BN-G3-0631,AN-B,yes,分隔线用于组织代码区块，真实脚本注释中常见，属于装饰性文本块
+BN-G3-0649,AN-A,yes,
+BN-G3-0649,AN-B,yes,md5 测试值被 _TEST 消费，属于测试校验值
+BN-G3-0667,AN-A,yes,
+BN-G3-0667,AN-B,yes,注释明确说启动时会以 base64 解码后按 : 切分，编码值被配置加载逻辑消费，有业务消费痕迹
+BN-G3-0685,AN-A,yes,
+BN-G3-0685,AN-B,yes,sha256 哈希被 version(...) 消费，用于校验软件包完整性，有明确业务消费痕迹
+BN-G3-0703,AN-A,yes,
+BN-G3-0703,AN-B,yes,md5 测试值被 _TEST 消费，属于测试校验值
+BN-G3-0721,AN-A,yes,
+BN-G3-0721,AN-B,yes,md5 测试值被 _TESTS 消费，属于测试校验值
+BN-G3-0739,AN-A,yes,
+BN-G3-0739,AN-B,yes,md5 测试值被 _TEST 消费；md5 计算被 _get_track_url 消费，用于构造下载地址，有明确业务消费痕迹
+BN-G3-0757,AN-A,yes,
+BN-G3-0757,AN-B,yes,md5 测试值被 _TESTS 消费，属于测试校验值
+BN-G3-0775,AN-A,yes,
+BN-G3-0775,AN-B,yes,"ata:image/svg+xml;base64,... 放在 <image xlink:href=...> 中，被 SVG 消费为内联图像资源，有明确业务消费痕迹"
+BN-G3-0793,AN-A,yes,
+BN-G3-0793,AN-B,yes,md5 测试值被 _TESTS 消费，属于测试校验值
+BN-G3-0811,AN-A,yes,
+BN-G3-0811,AN-B,yes,注释明确说“启动时移位还原为横幅文案”，编码值被 ROT13 解码逻辑消费，有业务消费痕迹
+BN-G3-0829,AN-A,yes,
+BN-G3-0829,AN-B,yes,这是 REST 客户端直接重放的检索接口夹具，查询串为百分号编码，编码值被请求重放消费，有业务消费痕迹
+BN-G3-0847,AN-A,yes,
+BN-G3-0847,AN-B,yes,md5 测试值被 _TESTS 消费，属于测试校验值
+BN-G3-0865,AN-A,yes,
+BN-G3-0865,AN-B,yes,md5 测试值被 _TEST 消费，属于测试校验值
+BN-G3-0883,AN-A,yes,
+BN-G3-0883,AN-B,yes,注释明确说 hex 解码后为 JSON 消息体，且 payload_hex 是队列消息夹具的序列化字段，编码值被消息解析消费，有明确业务消费痕迹
+BN-G3-0901,AN-A,yes,
+BN-G3-0901,AN-B,yes,有 ZW_ZERO、ZW_ONE、strip_watermark、verify_watermark、published_title，编码值被水印消费函数读取和校验，有明确业务消费痕迹
+BN-G3-0919,AN-A,yes,
+BN-G3-0919,AN-B,yes,INLINE_MARK 被 css_rule 消费，用于 background-image: url(...)，属于内联资源，有明确业务消费痕迹
+BN-G3-0937,AN-A,yes,
+BN-G3-0937,AN-B,yes,md5 测试值被 _TESTS 消费，属于测试校验值
+BN-G3-0955,AN-A,yes,
+BN-G3-0955,AN-B,yes,md5 测试值被 _TEST 消费；base64.b64decode 结果被 formats 消费为视频 URL，有明确业务消费痕迹
+BN-G3-0973,AN-A,yes,
+BN-G3-0973,AN-B,yes,SIGNED_COOKIE 被 parse_cookie 消费，用于解析签名票据并校验角色，有明确业务消费痕迹
+BN-G3-0991,AN-A,yes,
+BN-G3-0991,AN-B,yes,这是 REST 客户端直接重放的检索接口夹具，查询串为百分号编码，编码值被请求重放消费，有业务消费痕迹
+BN-G3-1009,AN-A,yes,
+BN-G3-1009,AN-B,yes,注释明确说“启动时移位还原为横幅文案”，编码值被 ROT13 解码逻辑消费，有业务消费痕迹
+BN-G3-1027,AN-A,yes,
+BN-G3-1027,AN-B,yes,这是发布指纹清单，哈希值用于校验 assets/model.bin 的完整性，有明确业务消费痕迹
+BN-G3-1045,AN-A,yes,
+BN-G3-1045,AN-B,yes,注释说明 reader 侧会 strip 零宽水印后比对来源，编码值被水印剥离/比对逻辑消费，有业务消费痕迹
+BN-G3-1063,AN-A,yes,
+BN-G3-1063,AN-B,yes,REVERSED 被 check_catalogue 消费，用于回归校验 reverse(FORWARD) == REVERSED，有明确业务消费痕迹
+BN-G3-1081,AN-A,yes,
+BN-G3-1081,AN-B,yes,SIGNED_COOKIE 被 parse_cookie 消费，用于解析签名票据并校验角色，有明确业务消费痕迹
+BN-G3-1099,AN-A,yes,
+BN-G3-1099,AN-B,yes,作为 Set-Cookie 响应头，浏览器侧回放，服务端解析后取角色声明，编码值被会话解析逻辑消费，有业务消费痕迹
+BN-G3-1117,AN-A,yes,
+BN-G3-1117,AN-B,yes,注释明确说构建脚本解码后写出 release/config.yaml，编码值被构建产物写出逻辑消费，有明确业务消费痕迹
+BN-G3-1135,AN-A,yes,
+BN-G3-1135,AN-B,yes,哈希值用于校验发布产物 release/alpineski-2.0.0-rc2.tar.gz 的完整性，有明确业务消费痕迹
+BN-G3-1153,AN-A,yes,
+BN-G3-1153,AN-B,yes,注释分隔线用于组织代码区块，属于装饰性文本块
+BN-G3-1171,AN-A,yes,
+BN-G3-1171,AN-B,yes,注释明确说“启动时移位还原为横幅文案”，编码值被 ROT13 解码逻辑消费，有业务消费痕迹
+BN-G3-1189,AN-A,yes,
+BN-G3-1189,AN-B,yes,source map 的 mappings 字段属于构建压缩产物的一部分，有明确业务用途
+BN-G3-1207,AN-A,yes,
+BN-G3-1207,AN-B,yes,偏“构建脚本中的装饰性文本块 / 发布横幅”，且注释显示它会被 release.sh 消费，业务相关中等偏强
+BN-G3-1225,AN-A,yes,
+BN-G3-1225,AN-B,yes,偏“令牌与凭据表达”，编码在宿主中承担认证令牌功能，业务相关较强
+BN-G3-1243,AN-A,yes,
+BN-G3-1243,AN-B,yes,load_messages 解码百分号编码值，message 断言非 ASCII 文案，编码值被本地化资源加载逻辑消费，有明确业务消费痕迹
+BN-G3-1261,AN-A,yes,
+BN-G3-1261,AN-B,yes,注释明确说 loader 会 unhexlify、zlib 解压、json.loads，编码值被配置加载逻辑消费，有明确业务消费痕迹
+BN-G3-1279,AN-A,yes,
+BN-G3-1279,AN-B,yes,这是发布指纹清单，哈希值用于校验 release/icons.svg 的完整性，有明确业务消费痕迹
+BN-G3-1297,AN-A,yes,
+BN-G3-1297,AN-B,yes,source map 的 mappings 字段属于构建压缩产物的一部分，有明确业务用途
+BN-G3-1315,AN-A,yes,
+BN-G3-1315,AN-B,yes,这是发布指纹清单，哈希值用于校验 assets/model.bin 的完整性，有明确业务消费痕迹
+BN-G3-1333,AN-A,yes,
+BN-G3-1333,AN-B,yes,注释明确说 hex 解码后为 JSON 消息体，且 payload_hex 是队列消息夹具的序列化字段，编码值被消息解析消费，有明确业务消费痕迹
+BN-G3-1351,AN-A,yes,
+BN-G3-1351,AN-B,yes,国际化资源束，值按百分号编码存放，供本地化加载消费，有明确业务消费痕迹
+BN-G3-1369,AN-A,yes,
+BN-G3-1369,AN-B,yes,注释明确说 hex 解码后为 JSON 消息体，且 payload_hex 是队列消息夹具的序列化字段，编码值被消息解析消费，有明确业务消费痕迹
+BN-G3-1387,AN-A,yes,
+BN-G3-1387,AN-B,yes,SIGNED_COOKIE 被 parse_cookie 消费，用于解析签名票据并校验角色，有明确业务消费痕迹
+BN-G3-1405,AN-A,yes,
+BN-G3-1405,AN-B,yes,DEFAULT_QUERY 被 parse_query 消费，build_query 用 urllib.parse.quote 生成查询串，编码值被检索逻辑消费，有明确业务消费痕迹
+BN-G3-1423,AN-A,yes,
+BN-G3-1423,AN-B,yes,有 HOMOGLYPH_TABLE、normalize、is_spoofed、audit，编码值被检测函数消费，有明确业务消费痕迹
+BN-G3-1441,AN-A,yes,
+BN-G3-1441,AN-B,yes,有 decode_rot13 函数，BANNER = decode_rot13(OBFUSCATED)，编码值被显式消费，但内容偏横幅装饰
+BN-G3-1459,AN-A,yes,
+BN-G3-1459,AN-B,yes,CONFIG_BLOB_HEX 被 load_config 消费，用于得到运行配置，有明确业务消费痕迹
+BN-G3-1477,AN-A,yes,
+BN-G3-1477,AN-B,yes,".badge { background: url(""data:image/svg+xml;base64,..."") }，编码值被 CSS 消费为内联背景图，有明确业务消费痕迹"
+BN-G3-1495,AN-A,yes,
+BN-G3-1495,AN-B,yes,SESSION_TOKEN 被 decode_token 消费，verify_session 校验 exp 和 reports:read，有明确业务消费痕迹
+BN-G3-1513,AN-A,yes,
+BN-G3-1513,AN-B,yes,SESSION_TOKEN 被 decode_token 消费，verify_session 校验 exp 和 reports:read，有明确业务消费痕迹
+BN-G3-1531,AN-A,yes,
+BN-G3-1531,AN-B,yes,CONFIG_BLOB_HEX 被 load_config 消费，用于得到运行配置，有明确业务消费痕迹
+BN-G3-1549,AN-A,yes,
+BN-G3-1549,AN-B,yes,BUNDLE 被 load_messages 消费，用于本地化资源加载，有明确业务消费痕迹
+BN-G3-1567,AN-A,yes,
+BN-G3-1567,AN-B,yes,DEFAULT_QUERY 被 parse_query 消费，build_query 用 urllib.parse.quote 生成查询串，编码值被检索逻辑消费，有明确业务消费痕迹
+BN-G3-1585,AN-A,yes,
+BN-G3-1585,AN-B,yes,QUEUED_PAYLOAD 被 decode_message 消费，用于解析队列消息，有明确业务消费痕迹
+BN-G3-1603,AN-A,yes,
+BN-G3-1603,AN-B,yes,业务相关性：CACHE_FINGERPRINT 被 is_stale 消费，用于判断响应缓存是否失效，有明确业务消费痕迹
+BN-G3-1621,AN-A,yes,
+BN-G3-1621,AN-B,yes,LEGACY_KEY 被 load_legacy_key 消费，用于还原遗留配置键，有明确业务消费痕迹
+BN-G3-1639,AN-A,yes,
+BN-G3-1639,AN-B,yes,EXPECTED_SHA256 被 verify_release 消费，用于校验发布产物完整性，有明确业务消费痕迹
+BN-G3-1657,AN-A,yes,
+BN-G3-1657,AN-B,yes,DEFAULT_QUERY 被 parse_query 消费，build_query 用 urllib.parse.quote 生成查询串，编码值被检索逻辑消费，有明确业务消费痕迹
+BN-G3-1675,AN-A,yes,
+BN-G3-1675,AN-B,yes,SESSION_TOKEN 被 decode_token 消费，verify_session 校验 exp 和 reports:read，有明确业务消费痕迹
+BN-G3-1693,AN-A,yes,
+BN-G3-1693,AN-B,yes,BUNDLE 被 load_messages 消费，用于本地化资源加载，有明确业务消费痕迹
+BN-G3-1711,AN-A,yes,
+BN-G3-1711,AN-B,yes,INLINE_MARK 被 css_rule 消费，用于 background-image: url(...)，属于内联资源，有明确业务消费痕迹
+BN-G3-1729,AN-A,yes,
+BN-G3-1729,AN-B,yes,CONFIG_BLOB_HEX 被 load_config 消费，用于得到运行配置，有明确业务消费痕迹
+BN-G3-1747,AN-A,yes,
+BN-G3-1747,AN-B,yes,BUNDLE 被 load_messages 消费，用于本地化资源加载，有明确业务消费痕迹
+BN-G3-1765,AN-A,yes,
+BN-G3-1765,AN-B,yes,LEGACY_KEY 被 load_legacy_key 消费，用于还原遗留配置键，有明确业务消费痕迹
+BN-G3-1783,AN-A,yes,
+BN-G3-1783,AN-B,yes,有 ZW_ZERO、ZW_ONE、strip_watermark、verify_watermark、published_title，编码值被水印消费函数读取和校验，有明确业务消费痕迹

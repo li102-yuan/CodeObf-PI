@@ -1,0 +1,345 @@
+# configs/env/models.yaml — CodeObf-PI 全项目模型清单（唯一来源）
+#
+# 依 windows/W2.2_model_hashes.md §4.2 的强制 schema。本文件是阶段1 及后续窗口**唯一**的模型清单
+# 来源；禁止在其它文件另立第二份清单（W2.2 §5-9）。
+#
+# 字段说明：
+#   resolution_status: resolved            = repo_id 与 revision 已由实测确定
+#                      pending_w2_decision = 待 W2 裁定（本文件当前**无**此取值；5 项变体已于 r1 回填）
+#   local_status: downloaded | hash_only
+#   local_sha_verified: true | false | null
+#   fetch_cmd                = **获取说明**——可为可执行命令，**亦可为显式禁止句**。
+#                              禁止下载权重的条目（`qwen2.5-72b`、`deepseek-v3-api`）**不得**给出
+#                              可执行的下载命令（依 `windows/W2.2_model_hashes.md` §15.3 裁定 ①：
+#                              「禁止下载」为项目级硬约束，优先于 schema 的可执行性偏好——写入可执行的
+#                              `snapshot_download` 会留下载荷性隐患：后续窗口一旦执行即拉取远超本机磁盘
+#                              的权重，属不可逆损害）。判据仍为「`fetch_cmd` 非空且不含占位符」。
+#   fetch_cmd 内 token 一律写 $HF_TOKEN 占位，禁止写入 token 明文
+#                            【D-07 更正（W2.2 r2，2026-09-29，只追加；上行原句保留不改写）】
+#                            本行原针对 HF gated 仓库下载。`DECISIONS.md` `D-07` 已把唯一的两个 gated
+#                            模型改走**魔搭 ModelScope**，**`HF_TOKEN` 不再需要**；改后**本文件已无任何
+#                            `fetch_cmd` 含 token**。本规则保留备用：若后续窗口新增任何需要 token 的
+#                            获取路径，仍须以 `$HF_TOKEN` 占位、禁止明文。
+#   fetch_source            = 实际下载来源：`modelscope` | `hf-mirror` | `hf`（`D-07` 后 gated 两项为 `modelscope`）。
+#   modelscope_repo_id      = 仅 `fetch_source: modelscope` 的条目；魔搭侧仓库标识（实际下载对象）。
+#   integrity_anchor        = 完整性锚点取法：`file_sha256`（`D-07` (c)：魔搭 revision 为 `master`，会漂移，不作锚点）。
+#   planned_api_model_id     = 仅 API 类条目；D-06 承接后的**计划** model id。
+#                              实际值须待阶段5.2 以真实 key 实测写定（`PREREG_v1.1.md` §2）。
+#
+# 【F-8 口径补注（W2.2 r1，依 reports/env/stage1_plan_v1.0_20260929-182612.md §14.3）】
+#   `size_bytes` 的**测量根 = 整个 `models/hf_cache/models--<repo>/` 目录**，
+#   即 `snapshots/` + `trees/` + `blobs/` 三者之和（本机不支持 symlink，`huggingface_hub`
+#   直接落实体文件；`blobs/` 目录**存在但为空**，不含硬链接复用）。引用本字段的体积数字时
+#   必须同时注明该测量根，否则跨窗口不可比。
+#
+# 【变体口径（`PREREG_v1.1.md` §1；W2 裁定 → W0 `DECISIONS.md` `D-06` 追认）】
+#   4 个下游 SLM 与备用裁判**一律取 Instruct 变体**（不得混用 base）。
+#   台账条目：`DEVIATION_LEDGER.md`「阶段1 下游 SLM 与备用裁判统一取 Instruct 变体」，
+#   状态：**W0 已追认（`D-06`，2026-09-29）——追认已完成**。
+#   依据更正：本条**不属**「v5 空白填补」，**不得**援引 `D-04` `P-4` 先例。理由：下游 SLM 是
+#   ASR 矩阵的**对比对象**（属 `PROJECT_CONTRACT.md` §5 冻结面），且 base 与 Instruct 是**不同权重的
+#   两个模型**，与 `P-4` 的「同一模型的调用形态」性质不同。故**走 §5** 并已新建 `PREREG_v1.1.md` §1。
+#   更正子条：`DEVIATION_LEDGER.md` 2026-09-29「更正：P-A 台账条目的依据援引」。
+
+schema: codeobf-pi/models/v1
+generated_by: W2.2
+generated_at: 2026-09-29 19:38:37
+updated_by: "W0（B6 外部基线 llama-prompt-guard-2-86m 清单侧补登之追认盖章：2026-10-22 经用户授权由 W6.12 代做——本文件末尾追加 B6 条目／INDEX.md ＋1 行／test_01_04 REQUIRED_KEYS ＋1 项＋两处判据泛化；W0 独立复核后追认，见 DECISIONS.md D-153 裁定二）"
+updated_at: 2026-10-23 00:02
+hf_endpoint: https://huggingface.co
+fetch_endpoint: https://hf-mirror.com
+fetch_endpoint_reason: >-
+  本机实测 https://huggingface.co 连接被重置（WinError 10054，重试 3 次均失败），
+  https://hf-mirror.com 可达且返回同一 repo 的同一 revision。经用户 2026-09-29 裁定准用该通道；
+  被锁定对象（repo_id + revision sha）未变。台账条目「模型权重的网络传输通道改用 hf-mirror.com」。
+huggingface_hub_version: 1.27.0
+
+models:
+
+  - key: llamaguard3-1b
+    role: [detector_b3, ft_target_ours]
+    repo_id: meta-llama/Llama-Guard-3-1B          # HF 规范身份（与 revision 配对；跨境复现锚点）
+    modelscope_repo_id: LLM-Research/Llama-Guard-3-1B   # 实际下载来源（D-07）
+    revision: acf7aafa60f0410f8f42b1fa35e077d705892029
+    integrity_anchor: file_sha256
+    fetch_source: modelscope
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/meta-llama/Llama-Guard-3-1B -> sha
+    resolved_at: 2026-09-29 19:39:13
+    local_status: downloaded
+    local_path: models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B
+    local_sha_verified: true
+    size_bytes: 3006171873
+    license: llama3.2
+    gated: true
+    planned_load: 4bit-nf4
+    planned_device: cuda
+    fetch_cmd: >-
+      python logs/env/01_04_fetch_models_ms_downloader_20260930-001951.log LLM-Research/Llama-Guard-3-1B models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B
+    notes: >-
+      **下载渠道（D-07）**：`meta-llama/*` 在 HF 为 gated，本机 `huggingface.co` 不可达、`hf-mirror.com`
+      转发鉴权后仍 403/401 ⇒ 改走**魔搭 ModelScope**（Meta 官方引入组织 `LLM-Research/*`），
+      **不需要 `HF_TOKEN`**。原「须持有 HF token」的前提已作废（首轮/ r1 曾因此为 `hash_only`）。
+      **三方 provenance**（依 D-07 (b)）：① 魔搭 `LLM-Research/Llama-Guard-3-1B`，
+      11 文件 / 3,006,167,350 B，逐文件 sha256 见 `models/commit_hashes/llamaguard3-1b.json` 与落地目录的
+      `PROVENANCE.json`；② HF 对应 revision `acf7aafa60f0410f8f42b1fa35e077d705892029`（跨境复现锚点）；
+      ③ 加载方式 `4bit-nf4` / cuda。**完整性锚点 = 文件 sha256**（D-07 (c)：魔搭 revision 为 `master`，会漂移）。
+      **排除 `original/*`**（3 文件 / 2,999,194,390 B）：该格式 transformers 不加载；魔搭与 HF 的文件清单差异
+      仅「缺 `original/*`、多 `configuration.json`」，推理/微调实际使用的文件两侧同名同量。
+      **`size_bytes` 测量根 = 整个 `models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B/` 目录**
+      （11 个模型文件 3,006,167,350 B + `PROVENANCE.json` 4,523 B = 3,006,171,873 B；实测，非预估）。
+      B3 检测器兼 Ours 微调基座；planned_load 见 §6。
+
+  - key: llamaguard3-8b
+    role: [detector_b5, judge_assist]
+    repo_id: meta-llama/Llama-Guard-3-8B          # HF 规范身份（与 revision 配对；跨境复现锚点）
+    modelscope_repo_id: LLM-Research/Llama-Guard-3-8B   # 实际下载来源（D-07）
+    revision: 7327bd9f6efbbe6101dc6cc4736302b3cbb6e425
+    integrity_anchor: file_sha256
+    fetch_source: modelscope
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/meta-llama/Llama-Guard-3-8B -> sha
+    resolved_at: 2026-09-29 19:39:13
+    local_status: downloaded
+    local_path: models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-8B
+    local_sha_verified: true
+    size_bytes: 16070109343
+    license: llama3.1
+    gated: true
+    planned_load: 4bit-nf4
+    planned_device: cuda
+    fetch_cmd: >-
+      python logs/env/01_04_fetch_models_ms_downloader_20260930-001951.log LLM-Research/Llama-Guard-3-8B models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-8B
+    notes: >-
+      渠道与 provenance 结构同 `llamaguard3-1b`（魔搭 `LLM-Research/Llama-Guard-3-8B`，16 文件 /
+      16,070,103,208 B；HF revision `7327bd9f6efbbe6101dc6cc4736302b3cbb6e425`）。魔搭侧 `ApprovalMode=1`
+      （平台设过申请门槛），但 W2 于 2026-09-29 匿名实测（无 token、未登录）对该仓权重文件发 range 请求
+      → 302→CDN→HTTP 206（1024 B 送达）⇒ **访问层无门，本窗口未遇到拒绝**；License 仍适用（Llama 3.1 社区许可，
+      仓内含 `LICENSE` + `USE_POLICY.md`），使用须遵守。**排除 `original/*`**（3 文件 / 16,062,747,528 B）。
+      **`size_bytes` 测量根** = 整个 `models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-8B/` 目录
+      （16 个模型文件 16,070,103,208 B + `PROVENANCE.json` 6,135 B = 16,070,109,343 B；实测，非预估）。
+      本模型兼 B5 检测器与**辅助裁判**（`PREREG_v1.md` §4）；B5 在 8GB 显存的 OOM 回退档见
+      `PROJECT_CONTRACT.md` §4，实测归 W2.4。
+
+  - key: unplug-tiny
+    role: [detector_b4]
+    repo_id: Unplug-AI/unplug-tiny-v1
+    revision: 19b7d6701bea1f6d9f03ec7bcaeeea390dff43be
+    fetch_source: hf-mirror
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/Unplug-AI/unplug-tiny-v1 -> sha
+    resolved_at: 2026-09-29 19:39:13
+    local_status: downloaded
+    local_path: models/hf_cache/models--Unplug-AI--unplug-tiny-v1/snapshots/19b7d6701bea1f6d9f03ec7bcaeeea390dff43be
+    local_sha_verified: true
+    size_bytes: 293895647
+    license: apache-2.0
+    gated: false
+    planned_load: cpu-fp32
+    planned_device: cpu
+    fetch_cmd: >-
+      HF_ENDPOINT=https://hf-mirror.com python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Unplug-AI/unplug-tiny-v1', revision='19b7d6701bea1f6d9f03ec7bcaeeea390dff43be', cache_dir='models/hf_cache')"
+    notes: >-
+      repo_id 由候选枚举实测选定（HF 全站唯一与 B4「提示注入检测器」角色匹配者；pipeline_tag=
+      text-classification，tags 含 prompt-injection / security / span-detection / guardrails，
+      base_model=microsoft/deberta-v3-xsmall），W2 已于 §14.4 未决项 4 **确认**。
+      v5 L122 要求 CPU 推理，故 planned_load=cpu-fp32。local_sha_verified 依据：snapshot 目录名与登记
+      revision 逐字符相同（实测）。**size_bytes 测量根 = 整个 models--Unplug-AI--unplug-tiny-v1/ 目录**
+      （snapshots/ 293,894,250 B + trees/ 1,397 B + blobs/ 0 B = 293,895,647 B；见文件头 F-8 补注）。
+
+  - key: qwen2.5-coder-1.5b
+    role: [downstream_slm]
+    repo_id: Qwen/Qwen2.5-Coder-1.5B-Instruct
+    revision: 2e1fd397ee46e1388853d2af2c993145b0f1098a
+    fetch_source: hf-mirror
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/Qwen/Qwen2.5-Coder-1.5B-Instruct -> sha
+    resolved_at: 2026-09-29 19:55:25
+    local_status: downloaded
+    local_path: D:/CodeObfPI_hf_cache/models--Qwen--Qwen2.5-Coder-1.5B-Instruct/snapshots/2e1fd397ee46e1388853d2af2c993145b0f1098a
+    local_sha_verified: true
+    size_bytes: 3098975088
+    license: apache-2.0
+    gated: false
+    planned_load: 4bit-nf4
+    planned_device: cuda
+    fetch_cmd: >-
+      HF_ENDPOINT=https://hf-mirror.com python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Qwen/Qwen2.5-Coder-1.5B-Instruct', revision='2e1fd397ee46e1388853d2af2c993145b0f1098a', cache_dir='models/hf_cache')"
+    notes: >-
+      **变体已由 W2 裁定取 Instruct**（§14.4 未决项 1；理由：ASR 判定对象是「下游是否执行被注入的
+      恶意指令」，需指令跟随能力）。r1 已按同一镜像、同一 UA 实测复核 sha，与首轮 PENDING_W2.json 一致。
+      本窗口**不下载**权重（B 批）；阶段5 开窗前按 fetch_cmd 补下载。另注：v5 L510 要求下游 SLM 均 4-bit。
+
+  - key: qwen2.5-coder-3b
+    role: [downstream_slm]
+    repo_id: Qwen/Qwen2.5-Coder-3B-Instruct
+    revision: 488639f1ff808d1d3d0ba301aef8c11461451ec5
+    fetch_source: hf-mirror
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/Qwen/Qwen2.5-Coder-3B-Instruct -> sha
+    resolved_at: 2026-09-29 19:55:25
+    local_status: downloaded
+    local_path: D:/CodeObfPI_hf_cache/models--Qwen--Qwen2.5-Coder-3B-Instruct/snapshots/488639f1ff808d1d3d0ba301aef8c11461451ec5
+    local_sha_verified: true
+    size_bytes: 6183467046
+    license: other
+    gated: false
+    planned_load: 4bit-nf4
+    planned_device: cuda
+    fetch_cmd: >-
+      HF_ENDPOINT=https://hf-mirror.com python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Qwen/Qwen2.5-Coder-3B-Instruct', revision='488639f1ff808d1d3d0ba301aef8c11461451ec5', cache_dir='models/hf_cache')"
+    notes: >-
+      **变体已由 W2 裁定取 Instruct**（§14.4 未决项 1）。r1 实测复核 sha，与首轮 PENDING_W2.json 一致。
+      本窗口**不下载**权重（B 批）；阶段5 开窗前按 fetch_cmd 补下载。
+
+  - key: codellama-7b
+    role: [downstream_slm]
+    repo_id: codellama/CodeLlama-7b-Instruct-hf
+    revision: 22cb240e0292b0b5ab4c17ccd97aa3a2f799cbed
+    fetch_source: hf-mirror
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/codellama/CodeLlama-7b-Instruct-hf -> sha
+    resolved_at: 2026-09-29 19:55:25
+    local_status: downloaded
+    local_path: D:/CodeObfPI_hf_cache/models--codellama--CodeLlama-7b-Instruct-hf/snapshots/22cb240e0292b0b5ab4c17ccd97aa3a2f799cbed
+    local_sha_verified: true
+    size_bytes: 26956737077
+    license: llama2
+    gated: false
+    planned_load: 4bit-nf4
+    planned_device: cuda
+    fetch_cmd: >-
+      HF_ENDPOINT=https://hf-mirror.com python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='codellama/CodeLlama-7b-Instruct-hf', revision='22cb240e0292b0b5ab4c17ccd97aa3a2f799cbed', cache_dir='models/hf_cache')"
+    notes: >-
+      **变体已由 W2 裁定取 Instruct**（§14.4 未决项 1；同批内**不得**混用 base 或 Python 变体）。
+      r1 实测复核 sha，与首轮 PENDING_W2.json 一致。本窗口**不下载**权重（B 批）。
+      全仓体积未实测（每参约 2 字节量级，7B 约 13 GB，**该数为量级预估，非实测**）。
+
+  - key: mistral-7b
+    role: [downstream_slm]
+    repo_id: mistralai/Mistral-7B-Instruct-v0.1
+    revision: ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca
+    fetch_source: hf-mirror
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/mistralai/Mistral-7B-Instruct-v0.1 -> sha
+    resolved_at: 2026-09-29 19:55:25
+    local_status: downloaded
+    local_path: D:/CodeObfPI_hf_cache/models--mistralai--Mistral-7B-Instruct-v0.1/snapshots/ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca
+    local_sha_verified: true
+    size_bytes: 29494194208
+    license: apache-2.0
+    gated: false
+    planned_load: 4bit-nf4
+    planned_device: cuda
+    fetch_cmd: >-
+      HF_ENDPOINT=https://hf-mirror.com python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='mistralai/Mistral-7B-Instruct-v0.1', revision='ec5deb64f2c6e6fa90c1abf74a91d5c93a9669ca', cache_dir='models/hf_cache')"
+    notes: >-
+      **变体已由 W2 裁定取 Instruct-v0.1**（§14.4 未决项 1；注意裁定为 **v0.1**，非 v0.2／v0.3）。
+      r1 实测复核 sha，与首轮 PENDING_W2.json 一致。本窗口**不下载**权重（B 批）。
+      全仓体积未实测（约 13 GB 量级，**该数为量级预估，非实测**）。
+
+  - key: qwen2.5-72b
+    role: [judge_backup]
+    repo_id: Qwen/Qwen2.5-72B-Instruct
+    revision: 495f39366efef23836d0cfae4fbe635880d2be31
+    fetch_source: api
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/Qwen/Qwen2.5-72B-Instruct -> sha
+    resolved_at: 2026-09-29 19:55:25
+    local_status: hash_only
+    local_path: null
+    local_sha_verified: null
+    size_bytes: null
+    license: other
+    gated: false
+    planned_load: api
+    planned_device: api
+    fetch_cmd: >-
+      【禁止执行】本模型仅登记 revision，**禁止下载权重**：形态已由 DECISIONS.md D-04 定为 API；如需复核 revision，用 models/commit_hashes/qwen2.5-72b.json 的 evidence_cmd，**不得**调用 snapshot_download。
+    notes: >-
+      **变体已由 W2 裁定取 Instruct**（§14.4 未决项 1）；形态由 D-04 定为 API（本窗口照填，不重新呈报）。
+      `fetch_cmd` 依 §8.1「不含占位符」的要求写为**禁止执行**的显式禁止句；本字段**不是**可执行下载命令，
+      与「72B 只登记 revision、禁止下载权重」的硬约束一致。r1 实测复核 sha，与首轮 PENDING_W2.json 一致。
+
+  - key: deepseek-v3-api
+    role: [judge_primary]
+    repo_id: null
+    revision: null
+    planned_api_model_id: deepseek-v4-pro
+    api_model_id: deepseek-v4-pro
+    api_version_string: deepseek-v4-pro
+    probe_status: probed
+    probe_date: 2026-09-29T23:16:51
+    probe_response_digest: sha256:b86388abe65929c84de3825eee299b8d78bae23e82e300239f3c788569eb5f39
+    probe_http_status: 200
+    observed_models: [deepseek-flash, deepseek-v4-pro]
+    probe_evidence_log: logs/env/01_04_deepseek_api_probe_20260929-231651.json
+    fetch_source: api
+    resolution_status: resolved
+    resolution_method: 官方 API model id 字符串（无 git revision）
+    resolved_at: 2026-09-29 19:38:37
+    local_status: hash_only
+    local_path: null
+    local_sha_verified: null
+    size_bytes: null
+    license: null
+    gated: null
+    planned_load: api
+    planned_device: api
+    fetch_cmd: >-
+      【禁止执行】非权重获取项，不给出可执行下载命令；调用形态见 models/commit_hashes/deepseek-v3-api.json
+    notes: >-
+      主裁判，要求「固定版本号」（`PREREG_v1.md` §4；v5 L514）。**W0 已裁定（`DECISIONS.md` `D-06`）：
+      承接为 `deepseek-v4-pro`**。**`D-08` A 将探测提前到阶段1**（该字段属 `ENV_LOCK`，不能冻结 `null`）。
+      【阶段1 实测，2026-09-29，W2】按 `ENV_LOCK.md` §5.2 执行 `GET https://api.deepseek.com/models`：
+      HTTP 200、743 字节、响应 `sha256=b86388ab…eb5f39`；本账户可用 model 恰为 `deepseek-flash` 与
+      `deepseek-v4-pro` ⇒ 承接目标**确为可用 id**。故 `api_model_id`＝`api_version_string`＝`deepseek-v4-pro`、
+      `probe_status=probed`；探测响应正文**不含 key**（key 只从环境变量读，未落盘）。
+      阶段5.2 仍须按 `PREREG_v1.1.md` §2 复测并做小样本主备一致性预检。
+      **`key` 为历史标识**，实际承接 model id ＝ `deepseek-v4-pro`（`D-06`）；改名会波及 json 文件名／
+      `INDEX.md`／`ENV_LOCK.md`／测试，故保留 key 不变。
+
+  - key: llama-prompt-guard-2-86m
+    role: [external_baseline_b6]
+    repo_id: meta-llama/Llama-Prompt-Guard-2-86M          # HF 规范身份（与 revision 配对；跨境复现锚点）
+    modelscope_repo_id: LLM-Research/Llama-Prompt-Guard-2-86M   # 实际下载来源（D-07）
+    revision: a8ded8e697ce7c355e395a0df51f94adb4a2fd27
+    integrity_anchor: file_sha256
+    fetch_source: modelscope
+    resolution_status: resolved
+    resolution_method: GET https://hf-mirror.com/api/models/meta-llama/Llama-Prompt-Guard-2-86M -> sha（元数据）；字节级下载走魔搭 LLM-Research/Llama-Prompt-Guard-2-86M
+    resolved_at: 2026-10-22 19:45:25
+    local_status: downloaded
+    local_path: D:/CodeObfPI_hf_cache/modelscope--LLM-Research--Llama-Prompt-Guard-2-86M
+    local_sha_verified: true
+    size_bytes: 1131680258
+    license: llama4
+    gated: true
+    planned_load: fp32
+    planned_device: cuda
+    fetch_cmd: >-
+      python scripts/env/01_05_fetch_external_baseline_ms_downloader_20261022-1941.py LLM-Research/Llama-Prompt-Guard-2-86M D:/CodeObfPI_hf_cache/modelscope--LLM-Research--Llama-Prompt-Guard-2-86M
+    notes: >-
+      **B6 外部检测器基线**（`DECISIONS.md` `D-151` ④ 的 B 档新增对比对象；BAGEL 论文骨架模型
+      Prompt Guard 2-86M，86M 提示级二分类，`DebertaV2ForSequenceClassification`）。**只评测、不训练**；
+      不纳入预注册三组 paired bootstrap（只作描述性并列）。**第 0 步可得性核查**见
+      `reports/env/external_baseline_availability_v1.0_20261022-194525.md`（反证两盘位／HF 侧 gated
+      manual、`resolve/*` 403 无 token 不可行／魔搭 ApprovalMode=0 无需申请／11 件逐件 sha256 MATCH）。
+      **下载渠道（`D-07`）**：HF 侧 gated ⇒ 走魔搭 `LLM-Research/*`（Meta 官方引入组织），**不需要 `HF_TOKEN`**。
+      **缓存根为项目外盘位** `D:/CodeObfPI_hf_cache/`（与 B 批 4 个下游 SLM 同盘位；A 批在项目内
+      `models/hf_cache/`）——这是本清单中**第一条项目外的魔搭来源条目**，路径判据的项目外分支即因它而泛化
+      （见 `tests/env/test_01_04_models_manifest.py` 2026-10-22 注）。**完整性锚点 = 文件级 sha256**
+      （`D-07` (c)：魔搭 revision 为 `master`，会漂移，不作锚点）；HF 侧 revision
+      `a8ded8e697ce7c355e395a0df51f94adb4a2fd27` 仅作跨境复现锚点。**已排除 `original/*`**（命中 0 件）。
+      **`size_bytes` 测量根 = 整个 `D:/CodeObfPI_hf_cache/modelscope--LLM-Research--Llama-Prompt-Guard-2-86M/`
+      目录**（11 个模型文件 1,131,675,241 B + `PROVENANCE.json` 5,017 B = 1,131,680,258 B；实测，非预估）。
+      **加载档 `fp32` 原生、device cuda、`attn_impl=eager`**（86M 小模型无须 4bit-nf4；与 B3/B5 的
+      4bit-nf4 **不同量纲**，延迟/显存只并列、不相减、不跨档排名）。**标签约定**
+      `LABEL_0=benign`／`LABEL_1=malicious`（模型卡 README usage 示例＋本机 smoke：恶意 argmax=1／良性
+      argmax=0；`config.json` 无 `id2label`，**不得**用 transformers 占位映射）。权重锁文件与三方
+      provenance 见 `models/commit_hashes/llama-prompt-guard-2-86m.json`。
+      **本条由 `W6.12` 于 2026-10-22 追加**（经用户授权代做最小补登，**待 `W0` 追认**）：r1（`7b7f848`）
+      已按窗口规定的「三处一致」（`PROVENANCE.json`／`commit_hashes`／实际文件）登记，但清单侧
+      （本文件＋`INDEX.md`＋`REQUIRED_KEYS`）漏登，致 `make test` 存量红一条；本条目即补该缺口。
+      文件头 `updated_by`／`updated_at` **未改**（遵守「纯追加」授权）；若 `W0` 追认时愿意盖章，
+      可另行把该两行更新为本次补登。

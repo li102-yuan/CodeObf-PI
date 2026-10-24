@@ -1,0 +1,8 @@
+table,split,none,b3,ours_v2,ours_v1_historical
+10a final_risk,id_test,0.0828,0.0073,0.0004 (-99.5% vs none),0.0025
+10a final_risk,ood_test,0.0614,0.0114,0.0280 (-54.4% vs none),0.0452
+10b pass_rate (3-seed sample-level true union),id_test,1.0000 (definitional),26/792,19/792 = 2.40%,6/792
+10b pass_rate (3-seed sample-level true union),ood_test,1.0000 (definitional),20/352,94/352 = 26.70%,93/352 = 26.42%
+10c sensitivity (ood),A project convention (true union x conditional ASR),--,--,0.0280 (-54.4%),--
+10c sensitivity (ood),B random single seed ((sample,seed) sum / 3n),--,--,0.0204 (-66.7%),--
+10c sensitivity (ood),C attacker picks any (any seed x any downstream),--,--,0.1250 (none same-basis ~0.19+, still below none),--

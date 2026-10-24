@@ -1,0 +1,20 @@
+{
+  "source": "PKU-SafeRLHF",
+  "hf_repo_id": "PKU-Alignment/PKU-SafeRLHF",
+  "hf_revision": "FIXTURE-REVISION-PKU",
+  "mirror_endpoint": "https://hf-mirror.com",
+  "fetch_cmd": "FIXTURE（离线夹具，无下载命令）",
+  "download_date": "2026-09-30",
+  "license": "FIXTURE-only",
+  "subset_rule": "FIXTURE：max(response_0_severity_level, response_1_severity_level) == 3 → 按 prompt 去重 → 抽样 2 条。",
+  "file_count": 1,
+  "total_bytes": 5814,
+  "files": [
+    {
+      "path": "data/Alpaca-7B/train.jsonl",
+      "bytes": 5814,
+      "md5": "6cebadd9edb093a6e10e6c7c1e130088",
+      "sha256": "d6723e27efdf1b4ac5dc7c7c4d00176375d32d906395c760102840d6ca89d98c"
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+# configs/data/freeze.yaml — W3.8 全流程冒烟与冻结 配置
+#
+# 依 `windows/W3.8_freeze.md` §2／§3 与 `DIRECTORY.md` §3.3／§3.4／§5、
+#    `PROJECT_CONTRACT.md` §1／§2／§3.1／§6。
+# 定值来源：`V-1`（440／7920）、`V-3`（8:1:1 + seed 42）、`V-5`／`V-6`（9 编码／2 载体／5／4 拆分）、
+#           `V-7`（5 载体子型）、`V-8`（良性 50/30/20）、`V-9`（UTF-8 + LF）、`V-10`（每组恒 2 条改写）。
+#
+# ⚠ 本文件**不含任何阈值的新定义**：全部门禁阈值在本文件中只是**转抄**，
+#   唯一权威出处是 `PREREG_v1.md` §5（及其补齐件）与 `configs/data/*.yaml`。
+#   `02_08` 的 `H1`–`H7` 一律**读文件实算**，脚本内的阈值仅用于与实算值比对，**不得就地放宽**。
+#
+# ⚠ 冻结目标目录一经生成即只读；不得覆盖（`DIRECTORY.md` §3.3）。
+
+freeze:
+  # --- 身份 ---
+  dataset: CodeObf-PI_v1.0
+  name: CodeObf-PI
+  version: "1.0"
+  status: frozen
+  freeze_script: scripts/data/02_08_freeze_dataset.py
+  smoke_script: scripts/data/02_00_smoke_data.py
+
+  # --- 冻结时必须成立的硬计数（`V-1`；与 `split_assertions.csv` 的 `A6`／`A7` 逐值比对）---
+  expected:
+    rewrite_bodies: 440            # `A6`
+    attack_total: 7920             # `A7` = 440 × 9 × 2
+    encodings: 9                   # `V-5`
+    carriers: 2                    # `V-5`
+    benign_total: 9000             # G1 4500 + G2 2700 + G3 1800
+    benign_G1: 4500
+    benign_G2: 2700
+    benign_G3: 1800
+    benign_ratio: {G1: 0.5, G2: 0.3, G3: 0.2}   # `V-8`
+    benign_ratio_tolerance: 0.001
+    seed_count_total: 220          # `N`（`seeds.meta.json`，`A13` 的派生基数）
+    split_ratio: "8:1:1"           # `V-3`
+    split_seed: 42                 # `V-3`
+    # `A13` 期望值 = round(N×0.8) : round(N×0.1) : N−前两者（Python 银行家舍入）
+    rounding_rule: python_round_half_to_even
+    assertions_rows: 14            # `A1`–`A14`，不得缺行
+
+  # --- 门禁阈值（**转抄**，非定义；`02_08` 只用于比对实算值）---
+  gates:
+    g1_intent:
+      threshold: 0.95              # `PREREG_v1.md` §5 补录（G4）
+      report_glob: reports/data/g4_intent_v1.0_*.md
+    g2_ast:
+      threshold: 0.10              # `PREREG_v1.md` §5 补录（G4）
+    g3_qc:
+      threshold: 0.95              # `PREREG_v1.md` §11.1；`PROJECT_CONTRACT.md` §3.1
+      min_annotators: 2
+      required_fields: [sample_id, annotator, pass, remark]
+    g4_guard:
+      threshold: 0.05              # `PREREG_v1.md` §5
+    g5_group:
+      # 门禁 5 的结论**只由 `02_07` 给出**（`H5`）：`A1`／`A2`／`A3`／`A4`／`A5` 全 `True`
+      gating_assertions: [A1, A2, A3, A4, A5]
+    g6_length:
+      threshold: 0.20              # `PREREG_v1.md` §5
+    g7_ngram:
+      threshold: 0.05              # 阈值一字未改；`D-36` 裁定一改为**报告项**（`passed` 恒 `n/a`）
+      role: report_item
+
+  # --- 输入路径（`data/interim/`，**只读**）---
+  inputs:
+    interim: data/interim/
+    seed_collect: data/interim/seed_collect/
+    seeds: data/interim/seed_collect/seeds.csv
+    seeds_meta: data/interim/seed_collect/seeds.meta.json
+    rewrite: data/interim/rewrite/
+    rewrites: data/interim/rewrite/rewrites.csv
+    encoded: data/interim/encoded/encoded.csv
+    code_carrier: data/interim/code_carrier/
+    code_carrier_csv: data/interim/code_carrier/code_carrier.csv
+    ast_report: data/interim/code_carrier/ast_report.csv
+    benign: data/interim/benign_G1_G2_G3/
+    benign_G1: data/interim/benign_G1_G2_G3/G1.csv
+    benign_G2: data/interim/benign_G1_G2_G3/G2.csv
+    benign_G3: data/interim/benign_G1_G2_G3/G3.csv
+    g3_qc: data/interim/benign_G1_G2_G3/g3_qc.csv
+    benign_guard_check: data/interim/benign_G1_G2_G3/benign_guard_check.csv
+    split_checks: data/interim/split_checks/
+    splits_root: data/interim/split_checks/splits
+    split_assertions: data/interim/split_checks/split_assertions.csv
+    length_distribution: data/interim/split_checks/length_distribution.csv
+    ngram_overlap: data/interim/split_checks/ngram_overlap.csv
+    ngram_controls: data/interim/split_checks/ngram_controls.csv
+    family_straddle: data/interim/split_checks/family_straddle.csv
+    seed_groups: data/interim/split_checks/seed_groups.csv
+    clean_original_test: data/interim/split_checks/clean_original_test.csv
+    g3_hard_negative_test: data/interim/split_checks/g3_hard_negative_test.csv
+    # 阶段1 冻结锚点（`PROJECT_CONTRACT.md` §2-7）
+    env_lock: ENV_LOCK.md
+    raw_root: data/raw/
+
+  # --- 输出路径 ---
+  outputs:
+    frozen_dir: data/frozen/CodeObf-PI_v1.0/
+    sealed_dir: data/sealed_test/CodeObf-PI_v1.0/
+    report_dir: reports/data
+    log_dir: logs/data
+    tmp_dir: logs/data/tmp/smoke_data/
+    report_basename: freeze_v1.0
+    smoke_report_basename: smoke_data_v1.0
+
+  # --- 冻结树结构（`DIRECTORY.md` §3.3 逐条对齐；**顺序即契约**）---
+  tree:
+    switches_root: [DATA_CARD_CodeObf-PI_v1.0.md, manifest.json, md5sums.txt, seed_groups.csv]
+    splits:
+      regime_id: [train.csv, val.csv, test.csv]
+      regime_ood: [train.csv, val.csv, test.csv]
+    benign: [G1.csv, G2.csv, G3.csv]
+    reports: [g3_qc.csv, length_distribution.csv, ngram_overlap.csv, split_assertions.csv]
+
+  # --- 封存测试集（`DIRECTORY.md` §3.4；**仅此一次生成**）---
+  sealed:
+    regime_id_test.csv: data/interim/split_checks/splits/regime_id/test.csv
+    regime_ood_test.csv: data/interim/split_checks/splits/regime_ood/test.csv
+    clean_original_test.csv: data/interim/split_checks/clean_original_test.csv
+    g3_hard_negative_test.csv: data/interim/split_checks/g3_hard_negative_test.csv
+    access_log: ACCESS_LOG.md
+    access_log_header_cols: 6
+    access_log_header: "| 日期 | 窗口 | 用途 | 命令 | 输出路径 | 复核人 |"
+
+  # --- 冒烟档参数（`02_00`；`windows/W3.8_freeze.md` §2）---
+  smoke:
+    seeds: 10                      # 缺省 10 个种子（v5 新增 18；`AGENTS.md` §3）
+    # 改写体数 = 种子数 × 每组改写体数（`V-10`：每组恰 2 条）；`02_00` 运行时**实测派生**，此处仅备忘
+    rewrites_per_group: 2
+    # `02_06 --smoke N` 的 N = **攻击单位数**（`family_atomic: true` 下单位为**族**）。
+    # ⚠ 实测（本窗口）：N ≤ 10 时 `test` 分片必空（10 组在 `family_atomic: true` 下凑不出 8:1:1
+    #   的最小可行解）⇒ `02_06` 的 `G1`／`G5` 必然 FAIL。N ≥ 20 起 `G1`–`G11` 全 PASS。
+    #   故**冒烟档的划分阶段取 20**，与「10 个种子」的口径差异在此**显式登记**，不隐藏。
+    split_units: 20
+
+  # --- 上游冻结锚点（`PROJECT_CONTRACT.md` §2-7 可追溯性）---
+  upstream:
+    prereg: [PREREG_v1.md, PREREG_v1.1.md, PREREG_v1.2.md, PREREG_v1.3.md]
+    source_lock_tag: source-lock-v1
+    env_lock_tag: env-lock-v1
+    env_lock_commit: 5afa574
+    stage2_plan: reports/data/stage2_plan_v1.0_20260930-184841.md
+    window: windows/W3.8_freeze.md
+
+  # --- 六个来源（`DIRECTORY.md` §3.1；`D-28`／`D-35` 的来源替换在 DATA_CARD 披露）---
+  sources:
+    - AgentHarm
+    - PKU-SafeRLHF
+    - TheStack
+    - CodeSearchNet
+    - Alpaca
+    - Wikitext
+
+# --- 落盘与报告 ---
+report_dir: reports/data
+log_dir: logs/data

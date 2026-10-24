@@ -1,0 +1,8 @@
+scenario,split,pass_denominator_units,aj_y,aj_n,not_applicable,unparsed,unparsed_rate_raw_base,asr_raw_with_na_unp,asr_judgeable_only,judgeable_denominator
+none,id_test,3168,210,2325,68,565,17.8%,0.0663,0.0828,2535
+b3,id_test,104,16,56,5,27,26.0%,0.1538,0.2222,72
+ours (v2),id_test,88,1,60,6,21,not registered (not computed),0.0114,0.0164 (1/61),61
+none,ood_test,1408,67,1024,40,277,19.7%,0.0476,0.0614,1091
+b3,ood_test,80,10,40,4,26,32.5%,0.1250,0.2000,50
+ours (v2),ood_test,824,76,649,5,94,11.4%,0.0922,0.1048 (76/725),725
+total,--,5672,380,4154,128,1010,--,0.0670,0.0838,--

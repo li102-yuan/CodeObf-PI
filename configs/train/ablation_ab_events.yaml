@@ -1,0 +1,38 @@
+# configs/train/ablation_ab_events.yaml — `W5.6` 消融 A／B 训练的**已知事件**如实登记
+#
+# 用途：供 `scripts/train/04_06_train_ablation_ab.py` 在汇总报告 **§10「已知事件（如实登记）」**
+#   渲染 ⇒ 防止「`SUMMARY_OK=6`」被误读为「**6 次均一次成功**」。
+#   **NaN 停工／重跑／归档等事件一律登记在此**，**不得**只报成功。
+#
+# 依据：`DECISIONS.md` `D-87`（2026-10-10，`A:id:456` `loss=NaN` 停工裁定）；
+#   `D-54` 裁定一／二／四（`ood:42` NaN 的同型处置：定性无效 run ＋ 归档 ＋ 重跑）；
+#   `D-84` 裁定六 2②（训练前骨架须自标「非结果」—— 同源的「如实披露」纪律）。
+#
+# ⚠ **禁令**：**不得删除** `state/*_NAN`／`*_NAN_INVALID`／`logs/train/_failed/*.log`
+#   （`D-87` 裁定三.4 沿用 `D-54` 裁定四.5）；本文件**只登记、不替代**现场归档。
+
+version: "1.0"
+authority: "`D-87`（`W5.6` 第 3 次 `A:id:456` `loss=NaN` 停工裁定）"
+declared_at: "2026-10-11"
+
+events:
+  - slot: "A:456"
+    kind: "loss_nan（守卫主动停，非进程中断）"
+    first_attempt_ts: "20261010-023548"
+    detected: "`logs/train/_failed/run_A_id_seed456_20261010-023548_NAN.log`：`NAN_GUARD_TRIGGERED step=214 epoch=1 loss=nan` ⇒ `NAN_GUARD_STOP` ⇒ `NAN_GUARD_EXIT step=214`（**退出码 3**）"
+    duration: "约 27 min（`epoch 1` 内；起 20261010-023548 → 停 2026-10-10 03:02）"
+    disposition: |
+      **定性 = 无效 run**（`D-87` 裁定一；**不得**采用「有效但退化」措辞）。
+      现场已归档（**只改名、不删**）：`checkpoints/ours/state/A_id_seed456_20261010-023548_NAN/`（含 latest／prev），
+      并**重建空的** `checkpoints/ours/state/A_id_seed456/` ⇒ 重跑判 `RESUME_STATE_INIT`；
+      日志移入 `logs/train/_failed/`（后缀 `_NAN`）。
+      `A/456` **无 ckpt 目录**（`epoch 1` 未产出）⇒ 无 `_NAN_INVALID` 改名对象。
+      **不改任何超参**（`D-87` 裁定四：warmup／lr／r／epochs／patience／样本集／增强／课程一律不变）。
+    rerun: "`20261010-075719`（**新 `run_id`、从头训练、同 seed**；`D-87` 裁定二 选「重跑」而非「续跑」）⇒ **本汇总所载者**"
+    note: |
+      **6 个权威 run 中 5 个一次成功、1 个（`A:456`）需重跑** ⇒ 汇总与论文**不得**只报「6/6 成功」。
+      `state` 洁净度已由 `W0` 亲跑 `torch.isfinite` 逐张量核验（`model_state.pt` **0 非有限 / 1,703,936**、
+      `opt_state.pt` **0 非有限 / 3,407,936**）⇒ **NaN 未落盘**（守卫「不落盘 state」行为正确）。
+      **观察（供 `W7` Discussion，`D-87` 裁定五；不得作因果或调参依据）**：A 组 `train_loss` 达 5e-4 量级
+      （`A/42`：0.00051／0.00079）⇒ 收敛极快、处于数值不稳定边缘；`A/42`／`A/123` 未触发、`A/456` 触发
+      ⇒ **单 seed 偶发、成因未定**。

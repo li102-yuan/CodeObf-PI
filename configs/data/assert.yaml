@@ -1,0 +1,129 @@
+# configs/data/assert.yaml — W3.7 自动断言 / 长度分布 / n-gram 重叠 配置
+#
+# 依 `windows/W3.7_assert.md` §3 与 `reports/data/stage2_plan_v1.0_20260930-184841.md` §3。
+#
+# ⚠ 本文件承载**门禁 5／6／7 的唯一判定参数**（`windows/W3.7_assert.md` §0：本窗口是这 3 道门禁的
+#   唯一判定者）。**阈值不得就地放宽**——改动只能走 `PROJECT_CONTRACT.md` §5 重大偏离（须 W0 事前批准）。
+#   本窗口**零推理**：不训练、不微调、不加载任何模型；唯一加载的是 tokenizer（非模型）。
+
+window: W3.7
+script: scripts/data/02_07_assert_splits.py
+
+# --- 输入路径（缺省值；CLI 同名参数优先） ---
+inputs:
+  split_dir: data/interim/split_checks/          # W3.6 产出的六个分片 + 两张派生视图 + seed_groups.csv
+  seeds_meta: data/interim/seed_collect/seeds.meta.json   # `A13` 的 `N` 唯一来源（禁硬编码）
+  ast_report: data/interim/code_carrier/ast_report.csv    # `A12` 的唯一来源（与门禁 2 同源）
+
+# --- tokenizer（长度口径；`ENV_LOCK.md` §5 登记的主检测器 tokenizer） ---
+#
+# 分词对象 = 分片 CSV 的 `text` 字段（`windows/W3.7_assert.md` §3.2）。
+# `token_length` 由 `scripts/data/_common.py` 提供（**唯一实现**，本窗口不改其签名）。
+tokenizer:
+  id: meta-llama/Llama-Guard-3-1B
+  # HF revision（`ENV_LOCK.md` §5 表登记值）；魔搭侧 revision 为 `master`（漂移，不构成锚点），
+  # 故完整性锚点另取本地 `tokenizer.json` 的 sha256（运行时实算并写入报告）。
+  hf_revision: acf7aafa60f0410f8f42b1fa35e077d705892029
+  local_dir: models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B
+
+# --- `A13` 划分比例（`V-3`）：8:1:1（group 级），划分种子 42 ---
+split_ratio:
+  train_share: 0.8
+  val_share: 0.1
+  split_seed: 42
+  # 取整规则（`W3` 裁定 2026-09-30，`windows/W3.7_assert.md` §3.1）：**Python 内置 `round()`**
+  # 即**银行家舍入（round-half-to-even）**，**不是四舍五入**。
+  #   n_train = round(N × 0.8)；n_val = round(N × 0.1)；n_test = N − n_train − n_val（末档取余，保证三档和恒为 N）。
+  # 工作示例：N=220 → 220×0.8=176.0 → 176；220×0.1=22.0 → 22；220−176−22=22 ⇒ 176:22:22
+  #           N=185 → 185×0.8=148.0 → 148；185×0.1=**18.5 → 18**（取偶）；185−148−18=19 ⇒ 148:18:19
+  #                   （四舍五入会得 18.5→19 ⇒ 148:19:18，**不同**）
+  rounding_rule: python_round_half_to_even
+  # 期望值的比较口径：**三档计数逐一等于派生值**（等式，非不等式）。
+  # 见运行报告 §3 与 `DEVIATION_LEDGER.md`：`windows/W3.7_assert.md` §3.1 正文另有「容许 ±1 group 偏差」
+  # 一句，但其 §5 第 1／2 条强制回归测试要求 `177/22/21 → 失败`、`148/19/18 → 失败`——
+  # **任何按档独立 ±1 的容忍都会使这两例通过**，故实现取等式；冲突已登记（文档面，非口径变更）。
+  tolerance_groups: 0
+
+# --- `A9` 正负比判定带（`V-4`；与 `configs/data/split.yaml` 的 `balance` 同源） ---
+label_balance:
+  band_low: 0.8
+  band_high: 1.25
+
+# --- 门禁 5 的语料常量（**不在此处重定义**：编码清单的唯一出处是 `scripts/data/_common.py`） ---
+gate5:
+  expected_rewrite_ids: 440          # `V-1` 改写体总数（转交项 1）
+  expected_attack_samples: 7920      # `440 × 9 × 2`（转交项 1）
+  expected_rows_per_rewrite: 18      # `A8`：9 编码 × 2 载体
+  # `A5` 的列扫描面（`windows/W3.7_assert.md` §3.1：对 `text` 与 `plaintext` 两列同时扫）。
+  # 参照集 = 留出编码行的 `payload` 与 `text`（**不含 `plaintext`**：它是改写体明文，在同一
+  # `rewrite_id` 的 9 编码 × 2 载体上恒等，并入参照集会把「同一改写体的训练编码行」误判为泄露）。
+  scan_columns: [text, plaintext]
+
+# --- 门禁 6（长度分布差值）：`abs_diff_ratio = |均值(正) − 均值(负)| / max(两均值)` ≤ 0.20 ---
+gate6:
+  threshold: 0.20
+
+# --- 门禁 7（3-gram 重叠率）：`|ngram(train) ∩ ngram(test)| / |ngram(test)|` ≤ 0.05 ---
+#
+# 判定**只认字符级 3-gram**；词级 3-gram 与字符级 4-gram 一并输出，**仅作对照**（`passed` 列留空）。
+#
+# ⚠ **判据角色已于 2026-10-02 由 `D-36` 裁定一变更**（`W3.7` 补正轮 r1 落实）：
+#   本量由**二值门禁**改为**报告项** —— **5% 阈值一字不改、未引入任何新阈值**，
+#   但 `passed` 记 **`n/a`**（不再有「通过／不通过」），且**不再触发非零退出、不阻塞 `W3.8` 冻结**。
+#   依据：`DECISIONS.md` `D-36` 裁定一；承接件 `PREREG_v1.3.md` §1（`D-36` 转交项 41）。
+#   报告与 `DATA_CARD` 须**并列呈现三项证据**（§1.2）：① 阈值与实测；② 对半控制（按 encoding_type）；
+#   ③ **随机对半控制**（本窗口补测，`D-36` 转交项 42）。泄露防护改由 `A1`／`A2`、`A3`–`A5`、
+#   `A14`（逐样本最近邻）、`family_atomic: true` 四条承担。
+gate7:
+  role: report_item            # 二值门禁 → 报告项（`D-36` 裁定一）
+  threshold: 0.05
+  judge_level: char
+  judge_n: 3
+  comparison:
+    - {level: word, n: 3}
+    - {level: char, n: 4}
+  # --- 三项证据中的 ②③：对半控制（**本窗口新增**；`D-36` 转交项 42） ---
+  #
+  # 判据自身不设通过/不通过，仅作证据。**唯一确定的口径**（本窗口声明）：
+  #   取该分片的**攻击行**，按 `sample_id` 字典序定序 ⇒ `random.Random(seed).shuffle` ⇒ 取前一半为 A、后一半为 B
+  #   ⇒ `overlap_rate = |ngram(A) ∩ ngram(B)| / |ngram(B)|`（字符级 3-gram，两侧各自并集）。
+  # ② `by_encoding`：**在每个 `encoding_type` 内部**各自对半（同分布、构造上零泄露；最严格分离）；
+  # ③ `random`     ：对**整个分片**的攻击行对半（不按编码分层）—— 这是把「该量对『跨分片』与
+  #                  『同分布』不可区分」由**论断**升为**实测证据**的那一项。
+  controls:
+    seed: 42
+    shards: [regime_id/test, regime_ood/test]
+    by_encoding: true
+    random: true
+    # 原子化前的旧划分**保留不覆盖**（`PREREG_v1.3.md` §3.3）⇒ 一并算，供「原子化前后对照」。
+    # 缺失则跳过（不报错）。
+    also_runs:
+      - {name: pre_atomic, dir: data/interim/split_checks/pre_atomic_run}
+
+# --- 门禁 2 的复算（`A12`；与 `02_04` 同源） ---
+a12:
+  threshold: 0.10
+
+# --- `A14`（**报告性断言，非门禁**；`W3` 裁定 2026-09-30） ---
+#
+# 触发式升级（归 `W3.6` §2.3.2 的 `family_atomic` 开关；**本窗口只测量、只呈报，不自行切换**）：
+#   族内 3-gram 中位数 ≥ 跨族中位数 × 2  **或**  跨档族数 > 0 且 族内 3-gram 中位数 > 0.20
+# ⇒ 须呈报 `W3` → `W0`。
+a14:
+  overlap_field: plaintext     # 语义泄露的度量对象 = 改写体明文（非编码后载荷）
+  trigger_ratio: 2.0
+  trigger_within_median: 0.20
+
+# --- 输出 ---
+output:
+  dir: data/interim/split_checks/
+  assertions: split_assertions.csv
+  length: length_distribution.csv
+  ngram: ngram_overlap.csv
+  ngram_controls: ngram_controls.csv     # ②③ 对半控制（`D-36` 转交项 42）
+  family_straddle: family_straddle.csv
+
+# --- 报告与日志 ---
+report_dir: reports/data
+log_dir: logs/data
+report_basename: g567_assert_v1.0

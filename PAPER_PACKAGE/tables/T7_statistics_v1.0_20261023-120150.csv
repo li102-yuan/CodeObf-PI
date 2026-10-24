@@ -1,0 +1,4 @@
+comparison,split,tau_tier,n,delta_f1_s42,delta_f1_s123,delta_f1_s456,ci95_s42,p
+ours_vs_b3,id_test,star,1583,+0.2301,+0.2282,+0.2333,"[0.2097, 0.2514]",0.000000
+ours_vs_b3,ood_test,star,740,+0.1388,+0.2326,+0.1789,"[0.0930, 0.1847]",0.000000
+ours_vs_b5,id_test,star,1583,+0.4716,+0.4697,+0.4748,"[0.4376, 0.5067]",0.000000

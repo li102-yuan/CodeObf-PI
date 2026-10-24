@@ -1,0 +1,135 @@
+{
+  "ts": "20261024-102637",
+  "script": "gen_fig1_r8_v1.0_20261024-102637.py",
+  "chart_type": "histogram (density, 40 bins over [0,1])",
+  "status": "final — promoted 2026-10-24 on user instruction (histogram chosen over ECDF/CCDF)",
+  "figure": "fig1_encoded_benign_score_dist_v1.0_20261024-102637",
+  "spec": {
+    "style": "windows/W7.1_figures.md §9.10 B",
+    "dpi": 300,
+    "formats": [
+      "png",
+      "pdf",
+      "svg"
+    ],
+    "in_figure_title": false,
+    "text_parse_math": false,
+    "panels": "2 rows (id,ood) x 5 cols (4 codes + plaintext control)"
+  },
+  "colors": {
+    "v2": "#1F3B73",
+    "v1": "#9AA5B1",
+    "grid": "#C8C8C8"
+  },
+  "bins": {
+    "n_bins": 40,
+    "edges": [
+      0.0,
+      0.025,
+      0.975,
+      1.0
+    ],
+    "density": true
+  },
+  "rate_source": "reports/analysis/mechanism_tables_v1.0_20261022-110225.csv",
+  "v1_source": "reports/eval/encoded_benign_fpr_persample_v1.0_{id42,rest}.csv",
+  "v2_source": "reports/eval/deconf_fourcell_persample_{id,ood}_seed{42,123,456}_pooled_*.csv",
+  "cells": [
+    {
+      "regime": "id",
+      "code": "hex",
+      "n": 2376,
+      "v1_fpr": 1.0,
+      "v2_fpr": 0.000421,
+      "v1_n_samples": 2376,
+      "v2_n_samples": 2376
+    },
+    {
+      "regime": "id",
+      "code": "morse",
+      "n": 2376,
+      "v1_fpr": 0.998737,
+      "v2_fpr": 0.038721,
+      "v1_n_samples": 2376,
+      "v2_n_samples": 2376
+    },
+    {
+      "regime": "id",
+      "code": "ascii_art",
+      "n": 2376,
+      "v1_fpr": 1.0,
+      "v2_fpr": 0.037037,
+      "v1_n_samples": 2376,
+      "v2_n_samples": 2376
+    },
+    {
+      "regime": "id",
+      "code": "homoglyph",
+      "n": 2376,
+      "v1_fpr": 0.305976,
+      "v2_fpr": 0.000421,
+      "v1_n_samples": 2376,
+      "v2_n_samples": 2376
+    },
+    {
+      "regime": "id",
+      "code": "plain",
+      "n": 2376,
+      "v1_fpr": 0.0,
+      "v2_fpr": 0.000421,
+      "v1_n_samples": 2376,
+      "v2_n_samples": 2376
+    },
+    {
+      "regime": "ood",
+      "code": "hex",
+      "n": 1461,
+      "v1_fpr": 1.0,
+      "v2_fpr": 0.731006,
+      "v1_n_samples": 1461,
+      "v2_n_samples": 1461
+    },
+    {
+      "regime": "ood",
+      "code": "morse",
+      "n": 1461,
+      "v1_fpr": 0.771389,
+      "v2_fpr": 0.12115,
+      "v1_n_samples": 1461,
+      "v2_n_samples": 1461
+    },
+    {
+      "regime": "ood",
+      "code": "ascii_art",
+      "n": 1461,
+      "v1_fpr": 0.663244,
+      "v2_fpr": 0.0,
+      "v1_n_samples": 1461,
+      "v2_n_samples": 1461
+    },
+    {
+      "regime": "ood",
+      "code": "homoglyph",
+      "n": 1461,
+      "v1_fpr": 0.771389,
+      "v2_fpr": 0.001369,
+      "v1_n_samples": 1461,
+      "v2_n_samples": 1461
+    },
+    {
+      "regime": "ood",
+      "code": "plain",
+      "n": 1461,
+      "v1_fpr": 0.0,
+      "v2_fpr": 0.002738,
+      "v1_n_samples": 1461,
+      "v2_n_samples": 1461
+    }
+  ],
+  "checks": {
+    "no_in_figure_title": true,
+    "plaintext_control_included": true,
+    "fpr_values_read_verbatim": true,
+    "sample_counts_match_table": true
+  }
+}

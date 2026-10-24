@@ -1,0 +1,365 @@
+# configs/eval/detection.yaml — W6.1（5.1 检测性能评估）**事前定值**载体。
+#
+# 冻结依据：`windows/W6.1_detection.md` §2（接口契约）／§3（硬约束 C1–C14）／§6（1583 条标定）
+# ／§7（τ 双轨与敏感性表）／§7.5（泄漏排除复跑）。
+#
+# **性质**：本文件的全部数值与规则**在数据／正式评估之前定值**（反事后择优）。
+# 实现期（`W6.1` 本窗口）与正式评估期只能**读取**本文件、**不得按结果改写**；
+# 确需变更 ⇒ 停工呈 W0（`windows/W6.1_detection.md` §11）。
+#
+# writer 侧禁令（由 `scripts/eval/05_01_eval_detection.py` 执行，不在本文件重复实现）：
+#  - `report-dir`／`outputs-dir` **不在此写死**（C9：由命令行给，脚本内不得硬编码 `reports/`）；
+#  - 分片清单在此写死 ⇒ **显式路径**；`--source sealed` 时按 `--split`＋`--regime` 解析，
+#    **禁止默认扫描**（`DIRECTORY.md` §5-6）。
+#
+version: "1.0"
+detector: ours
+detector_name: "Ours = QLoRA 微调 Llama-Guard-3-1B（生成式二分类）"
+stage: "05"
+seq: "01"
+window: "W6.1"
+frozen_by: "windows/W6.1_detection.md §2／§3／§6／§7"
+declared_at: "2026-10-06"
+declared_before: "any test-side number existed（实现期零次触碰封存）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C2 预处理：复用阶段3 冻结接口，**禁止自造读取或清洗**
+# ─────────────────────────────────────────────────────────────────────────────
+preprocess:
+  module: "scripts/baseline/03_06_unify_preprocess.py"
+  loader: load_samples          # 原文直通零清洗
+  sha256: sha256_of             # 跨阶段一致性锚点
+  md5: md5_of
+  read_rows: load_rows          # csv.DictReader（text 含换行 ⇒ 行数 ≠ 记录数，`W6.1` §8）
+  write_csv: write_csv          # 自带引号转义；写前断言无孤立 CR
+  text_column: text             # 唯一输入列（`DATA_CARD` §3）
+  label_column: label
+  max_seq_tokens: 512           # 与 B3／B5／门禁 4 同口径
+  truncation: truncate_left
+  truncation_side: left
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C3 score／判词：与训练侧（`04_01`）**同一定义**，本窗口不重新实现
+# ─────────────────────────────────────────────────────────────────────────────
+score:
+  definition: "p_unsafe / (p_unsafe + p_safe)"
+  position: first_generated_position
+  pred_rule: "score >= tau"
+  definition_source: "scripts/train/04_01_train_qlora_ours.py::forward_scores（复用，禁自造）"
+
+engine:
+  # C4／C5／C9：推理侧一律复用 `04_01` 的推理函数与确定性设置（唯一实现源）
+  module: "scripts/train/04_01_train_qlora_ours.py"
+  train_config: "configs/train/qlora_ours.yaml"   # weights／load／prompt／target／batch／determinism
+  reuse:
+    - build_model
+    - _unwrap
+    - resolve_target_ids
+    - build_prompt            # 左截断 512 → 官方 chat 模板
+    - forward_scores          # score 定义
+    - batch_mem_guard         # eval 态显存护栏（C10 同制）
+    - make_batches
+    - _prompt_tensors
+    - set_determinism         # CUBLAS_WORKSPACE_CONFIG／cudnn.deterministic／benchmark=False／allow_tf32=False
+  determinism:
+    cublas_workspace_config: ":4096:8"   # **import torch 之前**
+    cudnn_deterministic: true
+    cudnn_benchmark: false
+    allow_tf32: false
+    attn_implementation: eager
+    forbidden_attn: ["flash_attention_2", "sdpa"]
+  eval_state:
+    model_eval: true
+    no_grad: true
+    forbid_train_call: true    # 代码中不得出现 `.train(`
+  checkpoint:
+    read_only: true            # 只读 `best.json` 指向的 ckpt；禁写 `checkpoints/`
+    pointer: "best.json"
+    tau_source: "meta.json"    # ckpt 目录内（全精度）
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C1 输入面（显式路径；**禁止默认扫描**）
+# ─────────────────────────────────────────────────────────────────────────────
+inputs:
+  root: "data/frozen/CodeObf-PI_v1.0/splits"
+  # **显式**列举（禁止默认扫描，`DIRECTORY.md` §5-6）；A6 = A5 权限 ＋ sealed 4 分片
+  train:                                   # 仅 §7.5 泄漏复跑读取（交叉量大 ⇒ 慢），不进评估输入面
+    id: "data/frozen/CodeObf-PI_v1.0/splits/regime_id/train.csv"
+    ood: "data/frozen/CodeObf-PI_v1.0/splits/regime_ood/train.csv"
+  val:
+    id: "data/frozen/CodeObf-PI_v1.0/splits/regime_id/val.csv"      # 1584
+    ood: "data/frozen/CodeObf-PI_v1.0/splits/regime_ood/val.csv"    # 927
+  synthetic: {source: "self_generated"}     # 由本文件 `synthetic:` 块定义，**不取自任何测试分片**
+  sealed:
+    root: "data/sealed_test/CodeObf-PI_v1.0"
+    in_regime_test:
+      id: "data/sealed_test/CodeObf-PI_v1.0/regime_id_test.csv"
+      ood: "data/sealed_test/CodeObf-PI_v1.0/regime_ood_test.csv"
+    g3_hard_negative_test: "data/sealed_test/CodeObf-PI_v1.0/g3_hard_negative_test.csv"
+    # `clean_original_test` 归 `04_04`／`W5.4`，**不在本分派出数**（§1.3）
+    clean_original_test: "data/sealed_test/CodeObf-PI_v1.0/clean_original_test.csv"
+  forbidden_in_implementation:              # 实现期红线（C1／§4-1）
+    - "data/sealed_test/"
+    - "data/frozen/CodeObf-PI_v1.0/splits/regime_id/test.csv"
+    - "data/frozen/CodeObf-PI_v1.0/splits/regime_ood/test.csv"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C10 记录数断言（`csv.DictReader` 口径；W0 实测权威值，**禁改**）
+# ⚠ `regime_id_test.csv` 文件行数 = 61,918 ⇒ 行数 ≠ 记录数（§8）
+# ─────────────────────────────────────────────────────────────────────────────
+record_assertions:
+  regime_id_test: 1583
+  regime_ood_test: 740
+  clean_original_test: 44
+  g3_hard_negative_test: 64
+  id_val: 1584
+  ood_val: 927
+  on_mismatch: "nonzero_exit_and_stop_for_W0"
+
+csv_reading:
+  must_use: "csv.DictReader"
+  forbidden: ["readlines()", "split(chr(10))", "splitlines()", "regex_line_split"]
+  count_line_regression:            # §8-5 回归：text 含 2 个换行 ⇒ 记录数 1、行数 ≥ 3
+    records_expected: 1
+    lines_at_least: 3
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C4 τ（转交项 #48；`D-53` 裁定三／`D-47` 裁定二）
+# **逐 run 独立判定**；一律**全精度**；主口径条件式；并列报另一档
+# ─────────────────────────────────────────────────────────────────────────────
+tau:
+  per_run: true                     # 6 个 run 各有自己的 τ* 与 gap，不得一次性统一
+  full_precision: true              # `F-W5.1-2`：不得取显示值
+  fields_required:                  # 三者**任一缺失 ⇒ 停工呈 W0**，禁止补默认值／0.5 兜底
+    - tau_ours                      # = tau_star
+    - tau_main_override             # bool
+    - tau_neg_max_gap               # float，仅留痕与复核
+  main_criterion_rule:
+    if_override_true: 0.5
+    else: "tau_ours"
+    recompute_trigger_forbidden: true   # 脚本只做**读取与判定式应用**
+  parallel_track: true              # 主口径 ＋ 另一档（0.5 或 τ*）全给 TPR／FPR／F1／AUROC
+  sensitivity:
+    tiers: [fixed050, median_val, star]
+    fixed050:
+      value: 0.5
+      note: "定值对照（`D-46` 裁定三）"
+    median_val:
+      definition: "该 run **验证分片** `score` 的**中位数**（全精度）"
+      note: "分布中心；`W6.1` §12-3 已呈 W0 追认"
+    star:
+      definition: "该 run `meta.json` 的 `tau_ours`（全精度）"
+  quantiles: [min, p25, p50, p75, p90, p95, p99, max]
+  neg_max_required: true            # 负类 `score` max（`D-47` 关注点；复核 `tau_neg_max_gap`）
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C7 指标口径（`PREREG_v1.md` §3）
+# ─────────────────────────────────────────────────────────────────────────────
+metrics:
+  primary: [tpr, fpr, f1, auroc]
+  latency: [mean_ms, median_ms, p95_ms]
+  memory: [load_peak_mib, infer_peak_mib]
+  span_f1: "n/a"                    # Ours 为生成式二分类、无 span 输出 ⇒ **不适用**（非缺失）
+  auroc_source: "03_07.auroc（有连续 score ⇒ 可算；与 `BASELINE_REPORT.md` §1 注释 3 同口径）"
+  nan_rules:
+    fpr_undefined_when: "n_neg == 0"
+    auroc_undefined_when: "n_pos == 0 或 n_neg == 0"
+    render_as: "n/a"
+  aggregate:
+    mean_std: true                  # `D-47` 裁定四
+    per_seed_raw_table: true        # 一律给逐 seed 原值表
+    std_zero_declaration_slot: true # §10 声明位
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C8 延迟／显存口径（与 `BASELINE_REPORT.md` §1 逐列同构）
+# ─────────────────────────────────────────────────────────────────────────────
+latency:
+  excludes_model_load: true
+  monitor: per_batch               # 计时单位 = 批；逐样本 = 批耗时 / 批大小（amortized）
+  amortized_disclosure: "批次实测 ⇒ 必须与 `batch.eval_max_size` 一并披露（不得单独解读为单样本延迟）"
+  report: [mean_ms, median_ms, p95_ms]
+memory:
+  collector: "torch.cuda.max_memory_allocated"
+  states: [load, infer]
+  unit: MiB
+  gpu_capacity_mib: 8188
+  system_noise_mib_range: [1192, 1224]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C11 合成样本（**构造规则先写后跑**；可复现；**不得取自任何测试分片**）
+# ─────────────────────────────────────────────────────────────────────────────
+synthetic:
+  version: "1.0"
+  written_before_run: true          # 跑完不得改；同 Exploring 规则一起剥离长度混淆
+  origin: "脚本自造（内置词池／句池／代码骨架池 ＋ 9 种编码变换），**不取自任何测试分片**"
+  must_not_source:
+    - "data/sealed_test/**"
+    - "data/frozen/CodeObf-PI_v1.0/splits/*/test.csv"
+  reproducible: true
+  default_seed: 42
+  seed_choices: [42, 123, 456]
+  seed_cli: "--synthetic-seed"
+  n_default: 1583
+  sample_id_prefix: "syn"
+  families:
+    obfuscated:                     # 替代「攻击侧」形态
+      label: 1
+      intent_pool_size: 12          # 自撰、**高层非可操作**的意图句（安全研究用途）
+      wrapper_pool_size: 4          # 中立包裹模板
+      encodings: [base64, hex, rot13, reverse, url, zerowidth, morse, ascii_art, homoglyph]
+    plain:                          # 替代「良性侧」形态
+      label: 0
+      sentence_pool_size: 14        # 自撰良性请求句（代码审查／重构／解释）
+      skeleton_pool_size: 4         # 自撰良性代码骨架（含换行 ⇒ 顺带验证 CSV 引号转义）
+  pos_ratio:
+    mode: "derived_from_val"        # 取同体制 val 的正例占比，四舍五入到整数条
+  length_align:
+    rationale: "排除长度混淆（同 `D-53` 裁定二·第 2 条手法）"
+    target_source: "同体制 val 的样本 `text` 字符长度分布"
+    method: "inverse-quantile sampling：按 val 字符长度的分位数反演取目标长度，再渲染并裁剪到 ≤ 目标"
+    verify_on: [char_len, token_len]
+    report_quantiles: [min, p25, p50, p75, p90, p95, p99, max]
+    disclosed_not_asserted: true    # 事后陈述的**分布比对表**在报告披露，不新设通过阈值
+  newline_policy: "LF only（`write_csv` 断言无 CR）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §6 1583 条记录标定（转交项 #48）
+# ─────────────────────────────────────────────────────────────────────────────
+budget:
+  n_default: 1583
+  fill_order: [val, synthetic]      # 先 val 全量（不足则全取），再由合成补齐到**恰好** N
+  must_run_full: true               # 真跑 N 条，**禁止**小样本线性外推
+  on_resource_shortage: "stop_and_escalate_W0"   # **不得**自行改 `--budget-n`／`max_length`／batch
+  thresholds:                       # `W6.1` §12-6 事前定值（无预注册出处），已呈 W0 追认
+    max_total_minutes: 60
+    max_peak_mem_mib: 8000
+  report:
+    - BUDGET_N
+    - BUDGET_TOTAL_S
+    - BUDGET_PER_SAMPLE_MS
+    - BUDGET_PEAK_MEM_MIB
+    - BUDGET_SOURCE
+    - load_peak_mib
+    - infer_peak_mib
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §7.5 泄漏排除复跑（`D-46` 裁定二）
+# ─────────────────────────────────────────────────────────────────────────────
+leakcheck:
+  scope_train_val: true             # 实现期**只跑** train↔val
+  scope_train_test: "TBD（正式评估期执行；test 侧属 sealed）"
+  six_columns: [family_id, seed_id, seed_group_id, rewrite_id, sample_id, plaintext]   # 既有口径六项（`D-46` 裁定二）
+  reference_columns: [payload, text]   # 参照项（含空/排空并列报告）
+  empty_policy: "空值（空串）不参与交集统计"
+  report_both_before_and_after: true   # 排除空值**前后**两个值，**必须并列**
+  on_nonzero_after_dropna: "stop_and_escalate_W0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C12 ACCESS_LOG
+# ─────────────────────────────────────────────────────────────────────────────
+access_log:
+  required_for: ["--source sealed"]
+  columns: [date, window, purpose, command, output_path, reviewer]
+  script_writes: false              # 登记**由人手工完成**；脚本只在日志与报告 §9 回显 note
+  missing_note_action: "refuse_and_nonzero_exit"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 报告口径（§7.3 骨架；`W6.1` 产出的是**骨架**，正式数待正式评估期填）
+# ─────────────────────────────────────────────────────────────────────────────
+report:
+  skeleton_sections: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  placeholder: "<TBD>"
+  dryrun_must_match_skeleton_fields: true   # §5-2 逐字段相同
+  ood_val_declaration:                      # §7.4 逐字三句，不得弱化／改写成中性表述
+    - "ood_val 不测 OOD 泛化，只用于早停与阈值"
+    - "OOD 结论只取 ood_test"
+    - "不得因 ood_val 饱和而降低 ood 的训练要求（饱和是同分布所致，不是泛化证据）"
+  val_independence_declaration:             # 转交项 #51（`D-61` 裁定二）
+    - "**#51 · val 侧不独立**：`id_val` 与 `ood_val` **共享同一批验证文本**（设计依据 `DATA_CARD` 的 `V-2`＋`V-6`）⇒ 两体制的**验证集指标不独立**，**不得**当作两次独立测量。"
+    - "**#51 边界**（防被误读为缺陷）：**test 侧 `id_test` 与 `ood_test` 相互独立**（4 个留出码只在 test）⇒ **正式结论仍以 test 为准**；本条**只削弱 val 侧的独立证据力**，不构成泄漏或口径污染。"
+  tau_epoch_rule_declaration:               # 转交项 #52（`D-61` 裁定三）
+    - "**#52 · τ 取值规则**：**主口径 = 该 run 的 `best epoch` 的 `tau_ours`（全精度）**；触发条件**逐 epoch 重算**，但**只有 `best epoch` 的那次判定进入主口径** —— **不得**理解为「每个 epoch 的 τ 各自主口径」（那会使主口径在 run 内漂移）。"
+    - "**#52 落地**：`best.json` 的 `tau_ours`／`tau_main_override`／`tau_neg_max_gap` **三字段同源于 `best epoch`**；本窗口一律读 `best.json` 指向 ckpt 的 `meta.json`，并逐 run 打印 `best epoch`（见 §10.1）。"
+  forgetting_asymmetry_declaration:         # 转交项 #53（`D-62` 裁定三）
+    - "**#53 · val 轨道 `ΔF1` 的门禁偏松**：Ours 的 `tau_ours` 是在**同一 val 分片**上按 F1 最大寻得 ⇒ Ours 的 val 指标属**样本内**；基座为判词型、无 τ ⇒ 该不对称使 `ΔF1` **偏有利于 Ours**（门禁偏松）。**不自行校正、不据此调整阈值（仍 ≤ 0.03）**，并**优先以 clean 轨道结论为准**（`W5.4` 恰因 A5 无权限才退到 val 轨道）。"
+    - "**#50／#51／#52／#53 同源**（皆因「val 分片区分度不足 ＋ 样本内寻优」）⇒ 在 `W6.1` 报告与 `W7` 论文中**合并为一段 Limitation** 呈现。"
+  limitations_slots:                        # §10
+    - "val 区分度不足（`D-43`）"
+    - "early_stopped=False 系 epoch 预算耗尽，**不得**写成「早停选出」（`D-53` 裁定三 连带声明）"
+    - "两体制的「有效 epoch 数」不同 —— `id` 组 `early_stopped` 3×False（best 落 epoch 2／3／2）、`ood` 组 3×True（best **全在 epoch 1**）；这是**预注册设定**（`patience=2` ＋ 存 val 最优 ckpt）与 **val 何时饱和**共同决定的，**不是模型质量差异**（`D-61` 裁定四），与「val 区分度不足」同源"
+    - "family_atomic 行为多样性代价（`D-36`／转交项 43）"
+    - "epoch 长度不等属设计使然（`D-53` 裁定五③）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 正式评估期（`D-63` §三-2）：前置、范围与取值规则
+# ─────────────────────────────────────────────────────────────────────────────
+formal:
+  prerequisites:
+    - "6/6 实跑完工（`D-61`）"
+    - "`W5.4` 门禁通过（`D-62`）"
+    - "阶段4 正式关闭（`D-63`，tag `train-ours-v1`）"
+    - "读前**人工**登记 `ACCESS_LOG.md` 6 列（`C12`／`D-55` 裁定六 档③）"
+  scope:                    # 本窗口（`05_01`）的正式范围
+    - "A6 · `--source sealed --split in_regime_test --regime id`（`regime_id_test.csv` 1583）"
+    - "A6 · `--source sealed --split in_regime_test --regime ood`（`regime_ood_test.csv` 740）"
+    - "A6 · `--source sealed --split g3_hard_negative_test`（64，**两体制各评 6 run**，`PREREG_v1.md` §5）"
+  invocation_forms:         # 两种等价调用形式（`EVAL_PENDING` 修正后）
+    single_regime:
+      note: "给 `--regime {id|ood}` ⇒ 报告只含该体制；**门禁按本范围 3 run 判定**（不再被全量 6 误判为 `EVAL_PENDING`）"
+      gate: "regimes_in_scope × seeds（id 或 ood ⇒ 3）"
+    both_regimes_one_command:
+      note: "**省略 `--regime`** ⇒ 一条命令同时评两体制（逐体制取各自封存分片）"
+      gate: "regimes_in_scope × seeds（id+ood ⇒ 6）"
+      example: >-
+        python scripts/eval/05_01_eval_detection.py --source sealed --split in_regime_test
+        --runs-csv reports/eval/inputs/deconf_runs_v2_for_detection.csv
+        --config configs/eval/detection.yaml --report-dir reports/eval
+        --outputs-dir reports/eval/outputs_v2 --access-log-note "<已登记行摘要>"
+        # 【2026-10-22 · `D-149` 换代清单 ③】示例原用 v1 清单 `three_seeds_v1.0_20261008-003324.csv`
+        # ⇒ 照抄会跑回 v1 权重。现改为 v2（去混淆 6 run）清单与 `outputs_v2/`（v1 产物在 `outputs/`，勿混放）。
+  eval_pending_rule: "`EVAL_PENDING` **只在本次调用范围内** run 不全时判（范围内每个体制须 seed 齐全）"
+  metric_rendering:
+    na: "无定义（如全负分片的 TPR/`F1`/AUROC、无负样本的 FPR）⇒ `n/a`（不适用）"
+    tbd: "骨架态**待填**占位 ⇒ 只在 `skeleton=True` 渲染出现；**正式/演练报告内指标格不得出现 `<TBD>`**"
+  not_in_scope:
+    - "`clean_original_test.csv`（灾难性遗忘）⇒ 由 **`W6` 的 A6 侧**执行 `04_04 --clean-test`（`D-62` 裁定二-3／`D-55` 裁定三-1），**不**由 `05_01` 出数"
+  tau_epoch_rule: "该 run `best epoch` 的 `tau_ours`（全精度）—— 转交项 #52"
+  freeze_check: "`C14`：frozen 16/16 ＋ sealed 4/4（档② 字节校验，声明未读内容）"
+  leak_scope: "train↔val ＋ **train↔test**（正式期实算，test 侧取 sealed 分片）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §5 端到端演练（实现期「正式评估彩排」）
+# ─────────────────────────────────────────────────────────────────────────────
+dryrun:
+  sources_required: [val, synthetic]
+  same_code_path: true              # 与正式评估**同一份代码、同一分支**，禁旁路
+  assertions:
+    - record_count
+    - leak_assertion
+    - text_sha256_consistency      # `03_07.check_text_sha256_consistency`
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C14 冻结面复核
+# ─────────────────────────────────────────────────────────────────────────────
+freeze_check:
+  implementation_phase:
+    frozen_side: "data/frozen/CodeObf-PI_v1.0/md5sums.txt"
+    expect: "16/16 OK"
+    sealed_side: "not_checked（免触碰）"
+  formal_phase:
+    frozen_side: "data/frozen/CodeObf-PI_v1.0/md5sums.txt"
+    sealed_side: "data/sealed_test/CodeObf-PI_v1.0/md5sums.txt"
+    expect: ["16/16 OK", "4/4 OK"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C6 run 清单与检查（6 run 全评全报，禁按结果挑选）
+# ─────────────────────────────────────────────────────────────────────────────
+runs:
+  expected_n: 6
+  regimes: [id, ood]
+  seeds: [42, 123, 456]
+  source_csv: "reports/train/three_seeds_v1.0_*.csv"   # `04_03` 汇总 CSV 的 `run_dir` 列
+  run_dir_meta: "meta.json"                            # regime／seed 与命令行不符 ⇒ 非零退出
+  pointer: "best.json"
+  require_all_six: true             # ≠6（或未完工）⇒ **不评估**，保持 `EVAL_PENDING`（§11）
+  forbid_selection_by_result: true

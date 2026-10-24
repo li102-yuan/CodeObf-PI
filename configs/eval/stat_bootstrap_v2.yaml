@@ -1,0 +1,187 @@
+# configs/eval/stat_bootstrap_v2.yaml — **v2（去混淆）复评专用**；由 `stat_bootstrap.yaml` 派生
+# 变更范围：仅 `inputs.ours_ts` 两个时间戳（v1 20261008-* → v2 20261022-144138）
+# 不变量：对比对象（ours:b3 ×2、ours:b5 ×1）、n_boot=10000、boot_seeds、baseline 文件名、配对规则 全部逐字不变
+# configs/eval/stat_bootstrap.yaml — W6.9（5.8 统计严谨性）**事前定值**载体。
+#
+# 冻结依据：`windows/W6.9_bootstrap.md` §1.1（三组对比）／§2（接口契约）／§3（硬约束 C1–C10）；
+# 数值源头：`PREREG_v1.md` §5（`paired bootstrap 抽样次数 = 10000` ＋ 三组对比对象补录（G1））、
+# `SOURCE_LOCK/实验执行方案（最终版 v5）.md` §5.8 ＋「新增 33」。
+#
+# **性质**：本文件的全部数值与规则**在任何 bootstrap 数字产生之前定值**（反事后择优）。
+# 实现期与正式期只能**读取**本文件、**不得按结果改写**；确需变更 ⇒ 停工呈 W0
+# （`windows/W6.9_bootstrap.md` §8 回退点／§4 禁止项 2）。
+#
+# C9（报告路径必填、禁止硬编码）⇒ `report-dir` **不在本文件出现**；
+# 输入根目录由 `--ours-outputs`／`--baseline-outputs` 给出；本文件只定**文件名的择定规则**。
+#
+version: "1.0"
+stage: "05"
+seq: "08"
+window: "W6.9"
+frozen_by: "windows/W6.9_bootstrap.md §1.1／§2／§3"
+declared_at: "2026-10-08"
+declared_before: "any bootstrap number existed（本窗口只消费既有产物 CSV，不重跑任何模型）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C1 只做预注册三组（防多重比较）：命令行的 (ours, baseline, split) 三元组
+#    必须**逐一命中**本表；其余组合（含 `b2`／`b4`／`clean_test`／`g3_hard_negative_test`）
+#    一律**非零退出**。
+# ─────────────────────────────────────────────────────────────────────────────
+comparisons:
+  - id: "ours_vs_b3@id_test"
+    ours: ours
+    baseline: b3
+    split: id_test
+    regime: id
+  - id: "ours_vs_b3@ood_test"
+    ours: ours
+    baseline: b3
+    split: ood_test
+    regime: ood
+  - id: "ours_vs_b5@id_test"
+    ours: ours
+    baseline: b5
+    split: id_test
+    regime: id
+n_comparisons_expected: 3        # 机械核验：of record CSV 数据行恒 == 3（无第四行）
+
+# 对比对象一经确定不得增删（`windows/W6.9_bootstrap.md` §4-1；`D-53` 裁定四 红线）
+forbidden_baselines:
+  - id: b2
+    reason: "τ_B2 = −inf（平凡解，`BASELINE_REPORT.md` §4／§1 注释 2）⇒ 属退化形式，依 C4 不得作为对比对象"
+  - id: b4
+    reason: "非预注册三组之一（C1）；且 B4 属 CPU 档（`BASELINE_REPORT.md` §12-3），口径不同量纲"
+forbidden_splits: ["clean_test", "g3_hard_negative_test"]
+forbidden_splits_reason: "非 `PREREG_v1.md` §5 的三组对比数据集；且不属 OOD/ID 主分片"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C2 n_boot 定值 ＋ 种子
+# ─────────────────────────────────────────────────────────────────────────────
+n_boot: 10000                    # `PREREG_v1.md` §5「paired bootstrap 抽样次数 = 10000」
+n_boot_fixed: true               # 命令行给其他值 ⇒ 非零退出
+boot_seeds: [42, 123, 456]       # 复用预注册种子；**三个种子各跑一遍并报极差**，防单种子偶然
+boot_seed_uses: "同一整数同时作 (a) 选哪个 Ours run 的逐样本输出、(b) bootstrap 重采样的 RNG 种子"
+alpha: 0.05                      # 显著性水平（仅用于**描述**，不得据此改方法）
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C3 配对完整性
+# ─────────────────────────────────────────────────────────────────────────────
+pairing:
+  key: sample_id
+  verify_secondary: text_sha256  # 两侧同 `sample_id` 的 `text_sha256` 不一致 ⇒ 非零退出
+  on_missing: fail               # 缺失或多余 ⇒ **非零退出**
+  allow_intersection: false      # 禁止「取交集」或其他静默丢弃样本的方式（会改变总体）
+  label_source: ours             # baseline 逐样本 CSV 无 `label` 列 ⇒ 以 Ours 侧为准（配对后）
+  label_source_note: "两侧 `sample_id` 与 `text_sha256` 双重校验通过后，label 取 Ours 侧导出列"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C4 不可比性拦截
+# ─────────────────────────────────────────────────────────────────────────────
+metrics:
+  primary: f1
+  computable: [f1, tpr, fpr]
+  excluded:
+    auroc:
+      render: "n/a"
+      reason: >-
+        B1／B3／B5 无连续 `score`（规则型／判词型二值输出）⇒ `BASELINE_REPORT.md` §1 注释 3 已记 `n/a`；
+        配对两侧不可比 ⇒ 依 C4 **不得进入 bootstrap**，该格 `n/a` ＋ 声明，**禁止**强行算出数字。
+    span_f1:
+      render: "n/a"
+      reason: "仅 B4 有（且 B4 非本窗口对比对象）；Ours／B3／B5 均无跨度标注 ⇒ `n/a`"
+  n_a_is_not_tbd: true           # `n/a` = 无定义；`<TBD>` = 待填。两者不得互串（`W6.1` 先例）
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C5 口径一致性（**不重新寻优、不选阈值**）
+# ─────────────────────────────────────────────────────────────────────────────
+tau:
+  ours_column: pred              # 主口径 τ*（逐 run 取该 run `best epoch` 的 `tau_ours`，全精度；转交项 #52）
+  ours_parallel_column: pred_parallel   # 0.5 并列（同 `windows/W6.1_detection.md` §15.3）
+  baseline_has_tau: false        # B3／B5 判词型，无 τ
+  reoptimize: false              # 本窗口**禁止**重新寻 τ／选阈值／选 checkpoint
+  note: "两侧同分片、同预处理（阶段3 `03_06` 冻结口径＋`text_sha256` 一致性锚点）、同逐样本粒度"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 统计口径（**§9 呈 W0 第 1／2 项；事前定值，跑后不得改**）
+# ─────────────────────────────────────────────────────────────────────────────
+ci:
+  method: percentile             # 二选一**写定**：percentile ／ BCa
+  level: 0.95
+  declared: "95% 置信区间 = 百分位法（percentile）：取 bootstrap 分布的第 2.5／97.5 百分位"
+  alternative_not_used: "BCa（未采用：需 jackknife 影响值，对本二值指标非必需；方法须二选一并写定）"
+p_value:
+  sided: two
+  formula: "p = 2 * min(P(Δ<=0), P(Δ>=0))"
+  continuity_correction: false
+  clipped_to: 1.0
+  declared: >-
+    两侧 p 值，由 bootstrap 分布直接计算：`2 * min(P(Δ<=0), P(Δ>=0))`（下尾含等号 Δ<=0，
+    上尾含等号 Δ>=0），**不做连续性修正**；结果裁剪到 [0, 1]。
+multiple_comparison:
+  correction: none
+  declared: >-
+    理由：本窗口**只做** `PREREG_v1.md` §5 预注册的三组对比
+    （v5「新增 33」明确要求「不要无差别全部做 bootstrap…减少多重比较问题」），
+    非事后全量筛选 ⇒ 按 v5 原方案不校正；该「未做校正」须在报告中**显式声明**。
+  forbid_post_hoc_change: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# `std=0` 退化（`D-47` 裁定四／`D-61` 裁定七）
+# ─────────────────────────────────────────────────────────────────────────────
+degenerate:
+  std_zero: true
+  declared: >-
+    Ours 3 seeds 的 val 指标实测全同（`val_f1` 6/6 = 1.0）⇒ `mean ± std` 退化
+    ⇒ **一律给逐 seed 原值表** ＋ **显式声明退化**，**不得**只写 `mean ± std`。
+  bootstrap_unaffected: >-
+    paired bootstrap 按**逐样本配对**进行，与「seed 间方差」是两个不同层面的量：
+    前者刻画同一测试分片上的抽样不确定性，后者刻画训练随机性。二者**不矛盾**，
+    `std=0` 只影响 seed 间离散度的表述，不使 bootstrap 失效。
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 输入文件的择定规则（**禁止** glob 自动择一；0 或 >1 匹配 ⇒ 非零退出）
+# ─────────────────────────────────────────────────────────────────────────────
+inputs:
+  # 【2026-10-22 v2 复评专用副本】相对 `stat_bootstrap.yaml` **只改 `ours_ts` 两行**
+  # （v1 → v2 时间戳；其余逐字不变）。理由：`D-140` 路线 A 使 v2 成为论文主检测器，
+  # 而 `05_08` 的 C 类规则**禁止按 mtime/glob 择一**，时间戳必须显式给。
+  # v2 产物出处：`reports/eval/outputs_v2/ours_*_v1.0_<ts>.csv`（`05_01` 20261022-144138）。
+  ours_ts:
+    id_test:  "20261022-144138"
+    ood_test: "20261022-144138"
+  ours_file: "ours_{regime}_{seed}_{split}_v1.0_{ts}.csv"
+  baseline:
+    b3:
+      id_test:  "b3_id_test_v1.0_20261003-202509.csv"
+      ood_test: "b3_ood_test_v1.0_20261003-202509.csv"
+    b5:
+      id_test:  "b5_id_test_v1.0_20261004-005307.csv"
+      ood_test: "b5_ood_test_v1.0_20261004-005307.csv"
+  on_ambiguous: fail
+  ambiguous_reason: >-
+    `reports/eval/outputs/` 下同 `(regime, seed, split)` 存在**多个时间戳**的逐样本 CSV
+    （早期批次已被正式评估轮取代）⇒ **禁止**按 mtime 或 glob 静默择一；
+    权威 ts 由本节写死，命中 0 或 >1 即非零退出。
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C7 不读封存：本窗口输入是**既有产物 CSV**，不读 `data/sealed_test/**`
+# ─────────────────────────────────────────────────────────────────────────────
+sealed:
+  read: false
+  declared: "本窗口只读既有产物 CSV，未读 `data/sealed_test/**` ⇒ **ACCESS_LOG 零行登记**"
+  if_needed: "若确需读封存 ⇒ 人工登记 6 列 ＋ `--access-log-note`，并停工呈 W0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 报告必须齐备的声明（C8）
+# ─────────────────────────────────────────────────────────────────────────────
+declarations_required:
+  - "① 置信区间方法（percentile ／ 95%）"
+  - "② p 值口径（双侧 `2*min(P(Δ<=0), P(Δ>=0))`，不做连续性修正）"
+  - "③ 是否做多重比较校正（**未做** ＋ 理由：只三组且系预注册）"
+  - "④ val 侧样本内不对称的口径影响（转交项 #53：τ 在同 val 上寻优 ⇒ Ours 的 val 指标属样本内；**须优先以 clean 轨道结论为准**）"
+  - "⑤ 未做其他对比（C1）及其理由（v5 新增 33）"
+  - "⑥ 本窗口未读封存 ⇒ 零行 ACCESS_LOG 登记"
+  - "⑦ `std=0` 退化声明 ＋ 逐 seed 原值表"
+  - "⑧ `n_boot = 10000`（预注册要求，论文须注明）"
+  - "⑨ `p > 0.05` 只能表述为「未检出差异」，**不得**表述为「两组等价」"
+merged_limitation: "#51／#52／#53 同源（val 分片区分度不足 ＋ 样本内寻优）⇒ 三者在报告中合并为一段 Limitation"

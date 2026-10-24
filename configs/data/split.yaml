@@ -1,0 +1,172 @@
+# configs/data/split.yaml — W3.6 group-aware 划分与两套体制配置
+#
+# 依 `windows/W3.6_split.md` §2／§3 与 `reports/data/stage2_plan_v1.0_20260930-184841.md` §0／§2.2。
+# 定值来源：`V-2`（两体制共用同一 group 划分）、`V-3`（8:1:1 + 种子 42）、`V-4`（正负 ≈1:1）、
+#           `V-6`（体制二 5/4 编码）、`V-9`（UTF-8 + LF）；`V-10`（每组恰 2 条改写体）由上游保证。
+#
+# ⚠ 一旦落盘即冻结：改本文件 = 改划分 = 改数据，须走 `DEVIATION_LEDGER.md`（`V-3` 变更另须报 W3 → W0）。
+#   与脚本的契约一致性由 `02_06_split_group_aware.py` 启动时**双向校验**，不一致即非零退出。
+
+split:
+  # --- `V-3` 划分比例与随机种子（**本阶段最不可回退的一步**） ---
+  ratio: "8:1:1"
+  train_share: 0.8
+  val_share: 0.1
+  split_seed: 42
+
+  # --- 取整规则（`windows/W3.7_assert.md` §3.1 `A13` 的**派生式**，逐字一致） ---
+  #
+  # n_train = round(N × 0.8)；n_val = round(N × 0.1)；n_test = N − n_train − n_val。
+  # round 一律指 **Python 内置 `round()` = 银行家舍入（round-half-to-even）**，**不是四舍五入**。
+  # 末档 test 取 `N − 前两者`，保证三档之和恒为 N。
+  # 工作示例：N=220 → 176 : 22 : 22；N=185 → 148 : 18 : 19（四舍五入会得 148 : 19 : 18，**不同**）。
+  rounding_rule: python_round_half_to_even
+
+  # --- 划分单位（`V-2`：两体制**共用同一 group 划分**） ---
+  unit_attack: seed_group_id            # 攻击侧；`family_atomic: true` 时上提为 family_id
+  unit_benign: benign_group_id          # 良性侧；真值合成侧上提为场景（见 scene_unit）
+
+  # --- `family_id`（`W3` 裁定 2026-09-30，`windows/W3.6_split.md` §2.3.2） ---
+  #
+  # 语义族**只用于登记与测量，不改变划分单位**。
+  #   AgentHarm   ：同一 `id_original` 的 4 个变体共用一个族（`FAM-AH-0001` 起）
+  #   PKU-SafeRLHF：每个 group 自成一族（`FAM-PKU-0001` 起）
+  #   良性侧      ：填 `benign_group_id`
+  family_prefix_agentharm: FAM-AH
+  family_prefix_pku: FAM-PKU
+
+  # --- `family_atomic` 开关（`W3` 裁定：缺省 false；一次配置变更即可切换，**不重写脚本**） ---
+  #
+  # false：同族的 4 变体**可以**跨档（现行预注册设计：OOD 轴是**编码**而非语义）。
+  # true ：同族必须同档（族级原子划分）。
+  # 触发式升级归 `W3.7` 的 `A14`：族内 3-gram 中位数 ≥ 跨族中位数的 2 倍，
+  # 或「跨档族数 > 0 且族内重叠中位数 > 0.20」⇒ 呈报 `W3` → `W0` 裁定是否置 true。
+  #
+  # 【`r2`】触发器已成立（跨档族 17、族内中位数 0.6328）⇒ **`W0` `D-36` 裁定二批准置 `true`**；
+  #       口径正文 = **`PREREG_v1.3.md` §3**（划分单位 group → 族；`V-2`／`V-3` 比例与种子不变）。
+  #       ⚠ 翻转本键 = 换划分单位（**重大口径变更**，非工程性定值）；再改须 W0 裁定。
+  family_atomic: true
+
+  # --- 攻击侧分配器（`r2` 新增；键值决定「谁进哪一档」） ---
+  #
+  # `family_atomic: false`（单位组数全为 1）⇒ `slice`：全局打散序 + 按计数切片，
+  #   与 `b09771c` 的既有行为**逐字节一致**（保证 r1 已验收产物仍可由当前代码复现）。
+  # `family_atomic: true`（单位组数不等：AH 族恒 4 组、PKU 族恒 1 组）⇒ `source_stratified`：
+  #   按**来源**分层（层内按计数切片），再以**最小移动**修复到 `A13` 的组数目标。
+  #   理由（`r2` 实测）：若沿用「组数降序 + 组数贪心」（LPT），组数大的族会**整体被推向 `train`**
+  #   —— 实测 40/44 个 AH 族进 train ⇒ **来源构成失真**（train 的 PKU 占比 9.1% vs 语料 20%；
+  #   `val`／`test` 升到 63.6%）⇒ ID 体制 test 在**来源轴**上与 train 不同分布。
+  #   分层后：各档来源占比贴近语料，仍满足 `A13` 的 `176:22:22`（修复步保证逐格相等）。
+  attack_allocation:
+    when_family_atomic_false: slice
+    when_family_atomic_true: source_stratified
+
+  # --- 合成侧（G3-synthetic）场景约束（`windows/W3.6_split.md` §2.7；断言 `G10`） ---
+  #
+  # 场景 = `source_item_id` 的 `SC{nn}` 前缀（20 场景 × 35 变体 × 2 载体）。
+  # true ⇒ 同一场景的全部 group 上提为一个划分单位，保证同场景变体**必同分片**。
+  scene_unit: true
+  scene_field: source_item_id
+  scene_source: G3-synthetic
+
+  # --- 体制（`V-2`／`V-6`） ---
+  #
+  # regime_id ：score 全部 9 编码；三档均为全编码。
+  # regime_ood：train/val 只 5 训练编码；test 只 4 留出编码。
+  # 编码过滤的**作用面**（口径，见运行报告 §8 与 `DEVIATION_LEDGER.md`）：
+  #   攻击行 —— 按 `encoding_type` 严格过滤；
+  #   良性行 —— `encoding_type` 为空串（G1／G2，本身不含编码层）视为**无编码**、两体制均保留；
+  #             非空者按同一编码集过滤 ⇒ 留出 4 编码的 G3 样本**不会**进入体制二 train／val。
+  # 该口径使 `A3`／`A4`／`A5`（在非空 `encoding_type` 上判定）与 `AGENTS.md` §6-3 同时成立。
+  regime_ood_filter_applies_to: ["attack", "benign_nonempty_encoding"]
+
+  # --- 两体制的**分层**关系（`ood_subset_of_id`） ---
+  #
+  # true ⇒ 体制二每个分片的良性行集 ⊆ 体制一同分片（先配平体制一，再在其余集内按编码子集配平体制二）。
+  # 好处：`g3_hard_negative_test.csv` 取体制一的 G3 测试行即为**超集**。
+  # **筛选口径**（`windows/W3.6_split.md` §2.3 原文）：按 **`benign_group_id` ∩ 该体制 test 良性 group 集**。
+  #   ⚠ **不得**按 `encoding_type ∈ 留出 4 码` 过滤 —— `ood ⊆ id` 是**集合包含**，**不蕴含**
+  #   「按编码过滤 id 即得 ood」：体制二配平另削了若干体制一 test 良性 group，其 G3 行随之不在体制二。
+  #   （实测：本代按编码过滤得 84 行，其中 56 行在 `regime_ood` 三档中一条都不存在；正确取法为 28 行。）
+  #   【`r1` 更正（`W3` 验收 `F-1`）；仅改注释行，键值一字未动。】
+  ood_subset_of_id: true
+
+  # --- `V-4` 正负配平（每体制每分片各一次；**只减不增、不跨 group**） ---
+  balance:
+    target_ratio: 1.0          # 默认目标 = 正负等量（只能由上往下削）
+    band_low: 0.8              # **判定带**：ratio = n_pos / n_neg ∈ [band_low, band_high]
+    band_high: 1.25
+    drop_unit: group           # 只整组削减，**不拆 group**
+    order: benign_shuffle_order  # 削减次序 = 良性侧全局打散序（**不再消耗随机数** ⇒ 与是否 `--stratify-length` 无关）
+    # 长度分层时优先把正负比留在**判定带内部**（留余量，避免贴边）：
+    # 依次取上界 = floor(攻击行数 / r)，r ∈ count_window_ratios；
+    # 取**首个**使 `abs_diff_ratio ≤ threshold` 的窗口；全失败则取 `abs_diff_ratio` 最小者并如实报告。
+    # 最松一档取 0.82（而非判定带下界 0.80）：留 0.02 余量，避免把正负比**正好压在带边界**上
+    # —— 贴边会让 `02_07` 的复算对实现细节过于敏感。
+    count_window_ratios: [0.90, 0.85, 0.82]
+
+  # --- `--stratify-length`（门禁 6 回退动作；`PROJECT_CONTRACT.md` §4） ---
+  #
+  # 长度口径：token 数，tokenizer 取自 `ENV_LOCK.md` §5 登记的主检测器 tokenizer（Llama-Guard-3-1B）。
+  # 判定口径（`windows/W3.7_assert.md` §3.2）：abs_diff_ratio = |均值(正) − 均值(负)| / max(两均值) ≤ 0.20。
+  #
+  # 实现口径（见运行报告 §5 与本文件 `stratify.method`）：
+  #   ① 仅对**该分片默认配平后 `abs_diff_ratio` 仍 > (threshold − trigger_margin)** 的分片生效
+  #      （合规分片保持不动，避免无谓扰动）；
+  #   ② 对**良性侧**（数量较多的一侧）按**组均值长度的等频分桶**（`buckets` 个）做**分层选样**；
+  #   ③ 选样次序 = **均值定向贪心**：剔除组 `g` 后剩余均值为 `(T−sL)/(n−s)`，令其等于攻击侧均值 `A`
+  #      等价于 `D := T − A·n` 与 `u_g := s·(L − A)` 相等 ⇒ 每步剔除 `|u_g − D|` 最小的组，
+  #      随后 `D ← D − u_g`；首步后 `D ≈ 0`，此后持续剔除 `L ≈ A` 的组 ⇒ **均值贴住 `A`、行数单调下降**；
+  #   ④ 产出一条**组级剔除序列**后，各 count 窗口在同一序列上**取前缀**（不必重算）；
+  #      count 窗口上界依次取 `floor(攻击行数 / r)`，`r ∈ balance.count_window_ratios`，
+  #      取**首个**使 `abs_diff_ratio ≤ threshold` 者；
+  #   ⑤ **只减不增、不跨 group、不改变 group 的分片归属**；被削减的行落 `dropped_for_length.csv`。
+  #
+  # 与 §3 措辞的差异（**已登记 `DEVIATION_LEDGER.md`**）：§3 写「各桶按比例抽取」，但**按比例抽**
+  # 不改变该侧长度分布 ⇒ 无法使两个**均值**靠拢；故实现为「分层 + 非比例分配（按对齐参考均值定率）」，
+  # 即 `method: mean_targeted_stratified`。仍满足「分层 / 只减不增 / 不跨 group」三条硬约束，
+  # 且直接服务于 `abs_diff_ratio ≤ 0.20` 这一**唯一判据**。
+  stratify:
+    method: mean_targeted_stratified
+    buckets: 10
+    only_when_over_threshold: true
+    threshold: 0.20
+    # 触发余量：`abs_diff_ratio > (threshold − trigger_margin)` 即触发（默认 0.20 − 0.02 = 0.18）。
+    # 目的：判定带 ≤0.20，而 0.19x 的实算值虽合规却几无余量；留 0.02 使结果不贴边。
+    trigger_margin: 0.02
+
+  # --- 输入路径（缺省值；CLI 同名参数优先） ---
+  inputs:
+    encoded: data/interim/encoded/encoded.csv
+    code_carrier: data/interim/code_carrier/code_carrier.csv
+    benign_dir: data/interim/benign_G1_G2_G3/
+    seeds: data/interim/seed_collect/seeds.csv
+    seeds_meta: data/interim/seed_collect/seeds.meta.json
+    rewrites: data/interim/rewrite/rewrites.csv
+
+  # --- 期望计数（**由上游实测值定值**；不符即非零退出，防上游漂移） ---
+  #
+  # 刻意**不写死 440／7920 这两个数**于脚本内（`W3.7` 的 `A6`／`A7` 才作等式断言）；
+  # 本表只做「与上游文件实测一致」的交叉校验。
+  expected:
+    seed_groups_total: 220      # `seeds.meta.json` 的 `seed_count_total`（派生校验，不替代）
+    attack_rows: 7920           # 440 × 9 × 2
+    text_carrier_rows: 3960
+    code_carrier_rows: 3960
+    benign_files: [G1.csv, G2.csv, G3.csv]
+
+  # --- 输出 ---
+  output:
+    dir: data/interim/split_checks/
+    seed_groups: seed_groups.csv
+    clean_original_test: clean_original_test.csv
+    g3_hard_negative_test: g3_hard_negative_test.csv
+    dropped_for_length: dropped_for_length.csv
+    report_json: split_report.json
+    splits_root: splits
+    smoke_dir: smoke
+
+  # --- 报告与日志 ---
+  report_dir: reports/data
+  log_dir: logs/data
+  report_basename: split_v1.0

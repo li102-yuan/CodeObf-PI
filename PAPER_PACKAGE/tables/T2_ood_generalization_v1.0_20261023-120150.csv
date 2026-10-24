@@ -1,0 +1,3 @@
+tau_tier,id_tpr,ood_tpr,decay_delta,id_fpr,ood_fpr
+fixed050,0.9966,0.8125,-0.1841 (~18.4 pp),0.0000,0.0000
+star,0.9907,0.8049,-0.1858 (~18.6 pp),0.0000,0.0000

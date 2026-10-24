@@ -1,0 +1,173 @@
+# configs/train/forgetting.yaml — W5.4（灾难性遗忘验证，A5）**基座 val 侧实测**的加载／推理参数载体
+#
+# 冻结依据：`windows/W5.4_forgetting.md` §2.2 轨道②／§3（接口契约，W5 冻结 v1.0）；
+#           `DECISIONS.md` `D-41` 裁定五（本窗口调用 `03_03` 的四条约束）。
+#
+# **为什么另立一份、而不复用 `configs/baseline/b3_llamaguard1b.yaml`**（`D-41` 裁定五）：
+#   `b3_llamaguard1b.yaml` 的 `splits.all = [id_test, ood_test, clean_test]` **三个分片全在
+#   `data/sealed_test/`**，A5 窗口读它即触红线（`AGENTS.md` §6-6）。本件**只保留 frozen 侧
+#   `id_val`／`ood_val`**，并把 `integrity.access_log_required` 置 `false`（无 sealed 读取）。
+#
+# **口径沿用（不改）**：权重与 rev、`4bit-nf4`／cuda／`eager`、512 token 左截断、官方 chat 模板、
+# 判词首行首词映射、贪心生成参数 —— 与 `b3_llamaguard1b.yaml` **逐项一致**，
+# 以保证「基座 val 实测」与阶段3 的 B3 口径同源可比（v5 L412：clean 集用于与 Ours 做遗忘横向对比）。
+#
+# 读取约定：脚本在函数体内惰性 `import yaml`／`import torch`，保证 `make check` 探针轻量
+# （顶层不 import 重型库；`AGENTS.md` §3／`windows/W4.6_unify.md` §0.2-7）。
+
+version: "1.0"
+detector: b3
+detector_name: "Llama-Guard-3-1B（原始推理，不微调）—— W5.4 遗忘验证的基座侧实测"
+frozen_by: "windows/W5.4_forgetting.md §2.2／§3（`D-41` 裁定五）"
+declared_at: "2026-10-08"
+role: catastrophic_forgetting_base_val_reference
+
+# ---------------------------------------------------------------------------
+# 权重（provenance 三方：`ENV_LOCK.md` §5／§6）—— 与 B3 逐项同值
+# ---------------------------------------------------------------------------
+weights:
+  key: llamaguard3-1b
+  repo_id: "meta-llama/Llama-Guard-3-1B"
+  hf_revision: "acf7aafa60f0410f8f42b1fa35e077d705892029"
+  source_channel: modelscope
+  source_repo_id: "LLM-Research/Llama-Guard-3-1B"
+  local_path: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B"
+  provenance_file: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B/PROVENANCE.json"
+  local_files_only: true              # 禁止触网
+  exclude_prefixes: ["original/"]     # `D-11`：排除 original/*（1B 侧 3.00 GB）
+  finetuned: false                    # **基座 = 原始权重**；微调版 = Ours（04_01 产出）
+
+# ---------------------------------------------------------------------------
+# 加载（`ENV_LOCK.md` §6／§6.1：`4bit-nf4`／cuda／eager）
+# ---------------------------------------------------------------------------
+load:
+  mode: 4bit-nf4
+  device: cuda
+  device_map: {"": 0}
+  attn_implementation: eager          # 全阶段约定，禁 flash attention
+  dtype: bfloat16
+  quantization:
+    load_in_4bit: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_compute_dtype: bfloat16
+  forbidden_attn: ["flash_attention_2", "sdpa"]
+  eval_mode: true                     # `model.eval()`（G-EVAL；`AGENTS.md` §6-11）
+  no_grad: true                       # `torch.no_grad()` 硬断言
+
+# ---------------------------------------------------------------------------
+# 输入：原文直通 → 官方 tokenizer → 512 token／左截断（保尾部）
+# ---------------------------------------------------------------------------
+input:
+  column: text                        # `DATA_CARD` §3：阶段3–5 的唯一输入字段
+  pass_through: true                  # 原文直通：不清洗／不归一／不改大小写
+  max_seq_tokens: 512                 # §1.3 最大序列长度（与门禁 4 一致）
+  truncation_side: left               # 保尾部 512 token
+  truncation_applied_to: sample_text
+  add_special_tokens: false           # chat 模板已含 <|begin_of_text|>；与 `03_06` 同口径
+  tokenizer_local_files_only: true
+
+# ---------------------------------------------------------------------------
+# prompt：Llama-Guard-3 官方 chat 模板原样使用
+# ---------------------------------------------------------------------------
+prompt:
+  template_source: official_chat_template
+  apply_chat_template: true
+  add_generation_prompt: true
+  role: user
+  content_format: list_of_text_blocks
+  template_trims_content: true
+  categories: default_from_template
+  project_side_prompt_engineering: false    # 禁止任何项目侧 prompt 工程
+  empty_conversation_guard: true      # 渲染后会话段为空即抛错（防退化判词静默通过）
+
+# ---------------------------------------------------------------------------
+# 生成（确定性贪心；无采样）
+# ---------------------------------------------------------------------------
+generation:
+  do_sample: false
+  max_new_tokens: 20
+  num_beams: 1
+  temperature: null
+  top_p: null
+  pad_token_id_from: eos_token_id
+  decode_skip_special_tokens: true
+  seed: 42
+
+# ---------------------------------------------------------------------------
+# §3 判词 → 二分类映射（首行首词，冻结口径）
+# ---------------------------------------------------------------------------
+mapping:
+  kind: judgment
+  rule: first_line_first_word_equals_unsafe
+  unsafe_word: unsafe
+  safe_word: safe
+  unparsed_counting: true
+  unparsed_pred: ""
+  threshold: null
+  parse_steps:
+    - strip_whole_judgment
+    - take_first_line
+    - strip_line_and_take_first_whitespace_token
+  freeze_note: "首行首词口径冻结；`unparsed` 高时只登记计数与样例判词原文，不得自行改解析规则"
+
+# ---------------------------------------------------------------------------
+# §1 评估分片（**仅 frozen 侧验证分片**；`sealed_test` 一律不在本件内）
+#
+# 分片路径的唯一出处仍是 `configs/baseline/unify.yaml`（`W4.6` 冻结，只读引用）。
+# `id_val` = data/frozen/CodeObf-PI_v1.0/splits/regime_id/val.csv（1584 行，`sealed: false`）
+# `ood_val` = data/frozen/CodeObf-PI_v1.0/splits/regime_ood/val.csv（927 行，`sealed: false`）
+# ---------------------------------------------------------------------------
+splits:
+  eval: [id_val, ood_val]
+  all: [id_val, ood_val]
+  paths_from: "configs/baseline/unify.yaml"   # 只读引用；不复制任何 sealed 路径到本件
+  sealed: false
+
+# ---------------------------------------------------------------------------
+# 冒烟（双跑抽检）
+# ---------------------------------------------------------------------------
+smoke:
+  double_run_enabled: true
+  double_run_sample: first_of_split
+  compare: judgment_verbatim
+  on_mismatch: report_and_continue
+  note: "确定性抽检；全量 G-DET 已由 W2.3 冻结（logits md5 `bd5ff019fe7c7900080b6a8708d1de45`）"
+
+# ---------------------------------------------------------------------------
+# 显存与延迟记录
+# ---------------------------------------------------------------------------
+measurement:
+  memory:
+    metric: max_memory_allocated
+    states: [load, infer]
+    reset_between_states: true
+  latency:
+    metric: latency_ms
+    excludes: [model_load, csv_io]
+    stats: [mean, median, p95]
+
+# ---------------------------------------------------------------------------
+# 完整性与封存纪律
+# ---------------------------------------------------------------------------
+integrity:
+  text_sha256: true
+  md5_of_csv: true
+  md5sum_verify_after_read: false     # 只对 sealed 分片适用；本件不含 sealed 分片
+  access_log_required: false          # **无 sealed 读取 ⇒ 无需 ACCESS_LOG（A5 红线：根本不读）**
+  forbidden_substrings: ["data/sealed_test", "sealed_test", "test.csv"]
+  note: "`04_04` 侧另有独立的路径断言（传入 sealed 或 `test.csv` 立即非零退出）"
+
+# ---------------------------------------------------------------------------
+# 输出（由 `04_04` 用 `--outputs-dir`／`--report-dir` 重定向到 `reports/train/`；
+#       默认值在此仅为防御性登记，A5 不得写入 `reports/baseline/`）
+# ---------------------------------------------------------------------------
+output:
+  directory: reports/train/forgetting_outputs
+  filename: "b3_<split>_v1.0_<YYYYMMDD-HHMMSS>.csv"
+  columns: [sample_id, text_sha256, pred, raw_type, raw, score, latency_ms]
+  raw_type: judgment
+  score: null
+  auroc: "n/a"
+  encoding: utf-8
+  newline: lf

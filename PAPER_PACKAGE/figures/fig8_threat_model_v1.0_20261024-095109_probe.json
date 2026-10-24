@@ -1,0 +1,249 @@
+{
+  "png": "fig8_threat_model_v1.0_20261024-095109.png",
+  "coord_origin": "top-left",
+  "style": "r8c/compact (user 2026-10-24)",
+  "ts": "20261024-095109",
+  "canvas_inch": [
+    5.84,
+    3.046
+  ],
+  "box_rects_pt": {
+    "A": [
+      14.0,
+      156.25,
+      129.84,
+      193.34
+    ],
+    "D": [
+      164.48,
+      156.25,
+      244.08,
+      193.34
+    ],
+    "G": [
+      303.84,
+      156.25,
+      406.48,
+      193.34
+    ],
+    "B": [
+      14.0,
+      80.77,
+      67.2,
+      132.25
+    ],
+    "C": [
+      77.2,
+      80.77,
+      140.48,
+      132.25
+    ],
+    "E": [
+      164.48,
+      87.49,
+      279.84,
+      132.25
+    ],
+    "H": [
+      303.84,
+      95.65,
+      404.23,
+      132.25
+    ],
+    "F": [
+      164.48,
+      27.6,
+      276.24,
+      56.77
+    ],
+    "I": [
+      303.84,
+      12.0,
+      394.37,
+      56.77
+    ]
+  },
+  "arrows": [
+    {
+      "label": "Attacker→Train",
+      "points": [
+        [
+          40.6,
+          156.25
+        ],
+        [
+          40.6,
+          132.25
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "Attacker→Held-out",
+      "points": [
+        [
+          103.52,
+          156.25
+        ],
+        [
+          103.52,
+          132.25
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "Train→payload",
+      "points": [
+        [
+          67.2,
+          132.25
+        ],
+        [
+          164.48,
+          158.19
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "Held-out→payload",
+      "points": [
+        [
+          140.48,
+          132.25
+        ],
+        [
+          177.18,
+          156.25
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "payload→detector",
+      "points": [
+        [
+          204.28,
+          156.25
+        ],
+        [
+          204.28,
+          132.25
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "detector→downstream",
+      "points": [
+        [
+          279.84,
+          132.25
+        ],
+        [
+          303.84,
+          156.25
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "detector→training",
+      "points": [
+        [
+          198.01,
+          87.49
+        ],
+        [
+          198.01,
+          56.77
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "training→detector(闭环)",
+      "points": [
+        [
+          242.71,
+          56.77
+        ],
+        [
+          242.71,
+          87.49
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "downstream→judge",
+      "points": [
+        [
+          354.04,
+          156.25
+        ],
+        [
+          354.04,
+          132.25
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    },
+    {
+      "label": "judge→ASR",
+      "points": [
+        [
+          349.1,
+          95.65
+        ],
+        [
+          349.1,
+          56.77
+        ]
+      ],
+      "start_dist_px": 0.0,
+      "end_dist_px": 0.0
+    }
+  ],
+  "measurements": {
+    "legend_ciede2000": {
+      "attack side x defense & training": 46.94,
+      "attack side x payload & evaluation": 26.97,
+      "defense & training x payload & evaluation": 22.03
+    },
+    "box_overlap": 0,
+    "text_overlap": 0,
+    "legend_x_text": 0,
+    "text_out_of_box": 0
+  },
+  "subscript_check": {
+    "ascii_art": true,
+    "AJ-Y": true,
+    "UNP": true
+  },
+  "glyph_missing": {},
+  "artifacts": [
+    {
+      "name": "fig8_threat_model_v1.0_20261024-095109.png",
+      "sha256": "303977434ea8a1a5327c5fc8b45554920517113975605eef464da8b7c7289ba5"
+    },
+    {
+      "name": "fig8_threat_model_v1.0_20261024-095109.svg",
+      "sha256": "993594f954413b2c5dd1e6fc21b8d0d9ec0ed21667c6f642154cc3f6ab0104da"
+    },
+    {
+      "name": "fig8_threat_model_v1.0_20261024-095109.pdf",
+      "sha256": "6af3ee76620914d5489b64d3162770fcf322af2cbb9a02f51b60223fd9d72069"
+    }
+  ]
+}

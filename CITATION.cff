@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software or dataset, please cite the paper and this archived release."
+title: "CodeObf-PI v1.0: measuring and repairing the encoding shortcut in lightweight prompt-injection detectors for code"
+type: software
+authors:
+  - family-names: "Li"
+    given-names: "Peiyuan"
+    affiliation: "Nanjing University of Information Science and Technology"
+    orcid: "https://orcid.org/0009-0008-7982-9597"
+year: 2026
+version: "1.0"
+license: MIT
+keywords:
+  - prompt injection
+  - encoded prompts
+  - LLM guardrails
+  - code-reading agents
+  - de-confounding
+  - dataset
+abstract: >-
+  Controlled dataset and reference implementation for auditing whether lightweight
+  prompt-injection detectors respond to malicious intent or merely to the presence of
+  an encoding. Nine encodings are crossed with two carriers, and each malicious prompt
+  is paired with a benign prompt built from the same prefix base. The package contains
+  data-construction, baseline, fine-tuning, evaluation and audit scripts, the frozen
+  train/validation splits, the result tables and the figures. The sealed test split and
+  the LoRA adapters are not included.

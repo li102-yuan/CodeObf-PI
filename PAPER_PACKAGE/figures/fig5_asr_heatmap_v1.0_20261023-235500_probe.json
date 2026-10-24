@@ -1,0 +1,71 @@
+{
+  "png": "fig5_asr_heatmap_v1.0_20261023-235500.png",
+  "coord_origin": "top-left",
+  "style": "r8/D-180 §9.10B",
+  "ts": "20261023-235500",
+  "subscript_check": {
+    "id_test": true,
+    "ood_test": true
+  },
+  "glyph_missing": {},
+  "matrix": [
+    [
+      0.0828,
+      0.0614
+    ],
+    [
+      0.2222,
+      0.2
+    ],
+    [
+      0.0164,
+      0.1048
+    ]
+  ],
+  "cells": {
+    "none|id_test": [
+      "0.0828",
+      210,
+      2535
+    ],
+    "none|ood_test": [
+      "0.0614",
+      67,
+      1091
+    ],
+    "b3|id_test": [
+      "0.2222",
+      16,
+      72
+    ],
+    "b3|ood_test": [
+      "0.2000",
+      10,
+      50
+    ],
+    "Ours v2|id_test": [
+      "0.0164",
+      1,
+      61
+    ],
+    "Ours v2|ood_test": [
+      "0.1048",
+      76,
+      725
+    ]
+  },
+  "artifacts": [
+    {
+      "name": "fig5_asr_heatmap_v1.0_20261023-235500.png",
+      "sha256": "652e44081d634f31c9dac525f46014783b9b00cfe6ac985f8d417189da5738d8"
+    },
+    {
+      "name": "fig5_asr_heatmap_v1.0_20261023-235500.svg",
+      "sha256": "617baa59f38ed0b8bcaf23cb67cf0f364961a89f929964bf550cbfe5fd71b6e6"
+    },
+    {
+      "name": "fig5_asr_heatmap_v1.0_20261023-235500.pdf",
+      "sha256": "71b55c0bfabf153fb2f015ec4f9aca096e1a90b4d13faf40eec1f68cc37b661e"
+    }
+  ]
+}

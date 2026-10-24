@@ -1,0 +1,10 @@
+# Byte integrity first: never let git normalise line endings inside data files.
+# The frozen dataset ships md5sums.txt; any CRLF<->LF rewrite would invalidate it.
+* text=auto eol=lf
+*.csv -text
+*.tsv -text
+*.json -text
+*.pdf -text
+*.png -text
+*.svg -text
+*.bib -text

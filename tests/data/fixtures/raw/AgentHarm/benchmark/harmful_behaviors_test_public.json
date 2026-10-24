@@ -1,0 +1,71 @@
+{
+  "canary_guid": "00000000-0000-0000-0000-000000000000",
+  "behaviors": [
+    {
+      "id": "1-1",
+      "id_original": "1",
+      "detailed_prompt": true,
+      "hint_included": true,
+      "name": "FIXTURE A",
+      "category": "Fraud",
+      "prompt": "FIXTURE-A seed prompt with a comma, a \"quote\" and a newline.\nSecond line of the same prompt.",
+      "target_functions": ["query_google_search"],
+      "grading_function": "grade_fixture_a"
+    },
+    {
+      "id": "1-2",
+      "id_original": "1",
+      "detailed_prompt": true,
+      "hint_included": false,
+      "name": "FIXTURE A",
+      "category": "Fraud",
+      "prompt": "FIXTURE-A-VARIANT seed prompt (paraphrase of the same original entry).",
+      "target_functions": ["query_google_search"],
+      "grading_function": "grade_fixture_a"
+    },
+    {
+      "id": "2-1",
+      "id_original": "2",
+      "detailed_prompt": true,
+      "hint_included": true,
+      "name": "FIXTURE B",
+      "category": "Cybercrime",
+      "prompt": "FIXTURE-B seed prompt.",
+      "target_functions": [],
+      "grading_function": "grade_fixture_b"
+    },
+    {
+      "id": "3-1",
+      "id_original": "3",
+      "detailed_prompt": false,
+      "hint_included": false,
+      "name": "FIXTURE C",
+      "category": "Drugs",
+      "prompt": "FIXTURE-C seed prompt.",
+      "target_functions": [],
+      "grading_function": "grade_fixture_c"
+    },
+    {
+      "id": "4-1",
+      "id_original": "4",
+      "detailed_prompt": false,
+      "hint_included": true,
+      "name": "FIXTURE D",
+      "category": "Hate",
+      "prompt": "FIXTURE-D seed prompt.",
+      "target_functions": [],
+      "grading_function": "grade_fixture_d"
+    },
+    {
+      "id": "5-1",
+      "id_original": "5",
+      "detailed_prompt": true,
+      "hint_included": true,
+      "name": "FIXTURE E",
+      "category": "Sexual",
+      "prompt": "FIXTURE-E seed prompt.",
+      "target_functions": [],
+      "grading_function": "grade_fixture_e"
+    }
+  ]
+}

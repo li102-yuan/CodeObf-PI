@@ -1,0 +1,16 @@
+7a9d3c01ecf34d778a418fc74cf9827c  DATA_CARD_CodeObf-PI_v1.0.md
+df8b5377d8406b5f921048878ab93980  benign/G1.csv
+0615a7f0cc8cbacbb09f785f4051232e  benign/G2.csv
+f01e253cf9e3e39628512d67756df5ea  benign/G3.csv
+a2607e9ae81ff8ef78b990fe8dfdc92b  manifest.json
+4e5b2b0e8cc194f92a75675ab4e87869  reports/g3_qc.csv
+40c51c3dda9079e1fccd3a3f5e6f6e9a  reports/length_distribution.csv
+3b938677046c83a74d0a3441b74ce2cd  reports/ngram_overlap.csv
+f2781bbab96cf0146bd53b7c10df03a4  reports/split_assertions.csv
+c30258f75994abf214be0c4007ce00c3  seed_groups.csv
+2996d6700d8a830f69396adbaa6c74bf  splits/regime_id/test.csv
+b145bc6200bc8ae81f8bb9cb7485e502  splits/regime_id/train.csv
+33b6e80deafce54a490d3519ca8c9f97  splits/regime_id/val.csv
+eab30b0ff3f9404551ed6866b1fd6fe9  splits/regime_ood/test.csv
+e322115b3a9ae342ec99431b26d0729f  splits/regime_ood/train.csv
+6c246f1fb4c54268bafde12d7f1b8259  splits/regime_ood/val.csv

@@ -1,0 +1,5 @@
+target,split,bypassed,n,bypass_rate,mean_censored_18,mean_released,median_released
+b3,id_test,19,120,15.83%,16.075,5.84,3
+b3,ood_test,17,120,14.17%,16.042,4.18,3
+Ours (v2),id_test,46,360,12.78%,16.431,5.72,1
+Ours (v2),ood_test,21,360,5.83%,17.239,4.95,5

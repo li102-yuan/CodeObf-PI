@@ -1,0 +1,363 @@
+# configs/eval/ablation.yaml — W6.7（5.6 消融实验，A6）**事前定值**载体。
+#
+# 冻结依据：`windows/W6.7_ablation.md` §1（职责与四组定义）／§2（接口契约）
+# ／§3（硬约束 C1–C11）／§4（本窗口特有禁止项）／§7（验收）。
+#
+# **性质**：本文件的全部数值与规则在**任何消融数字存在之前**定值（反事后择优）。
+# 实现期与正式期只能**读取**本文件、**不得按消融结果改写**；确需变更 ⇒ 停工呈 W0
+# （`windows/W6.7_ablation.md` §8 回退点）。
+#
+# ⛔ 本轮（实现轮）的前置状态（`W6.7` §1.2 实测）：
+#   **A 组与 B 组的 ckpt 不存在**，且 `PROJECT_CONTRACT.md` §6 的 A6 行**明列「禁止训练」**
+#   ⇒ 本轮只交付**评估实现** ＋ 用 **C 组已有 ckpt ＋ A／B／D 的占位 `<TBD>`** 跑通端到端演练。
+#   **不得**伪造 A／B 组数字、**不得**用 C 组结果冒充 A／B。
+#
+# ✅ **完整轮（2026-10-11 起）**：上段为**实现轮的历史前置**，已失效 —— A／B 组 ckpt 由
+#   `W5.6`（A5）补训产出并验收通过（`D-91` 裁定一，tag `train-ab-v1`）⇒ 四组齐备。
+#   本轮全部补记见上方 `full_round_amendments`（**判据数值与口径一律未改**）。
+#
+# **单源复用**：输入面（`inputs`／`record_assertions`）／τ 规则／推理与指标层
+# 一律**取自 `W6.1` 的 `configs/eval/detection.yaml` 与 `scripts/eval/05_01_eval_detection.py`**，
+# 本文件**不复制**其内容，只给出**指针**（`base_config`／`reuse_module`）——避免两处口径漂移。
+#
+# writer 侧禁令（由 `scripts/eval/05_06_eval_ablation.py` 执行）：
+#  - `--report-dir`／`--outputs-dir` **不在此写死**（C9）；命令行必给；
+#  - 分片一律**显式路径**（经 `05_01.assert_input_allowed` 白名单），**禁止默认扫描**
+#    （`DIRECTORY.md` §5-6）。
+#
+version: "1.0"
+window: "W6.7"
+stage: "05"
+seq: "06"
+detector: ours
+detector_name: "Ours = QLoRA 微调 Llama-Guard-3-1B（生成式二分类）"
+frozen_by: "windows/W6.7_ablation.md §1／§2／§3／§4／§7"
+declared_at: "2026-10-09"
+declared_before: "any ablation number existed（本窗口实现轮；A／B 组 ckpt 尚不存在）"
+round: "FULL_ROUND"                  # 2026-10-11 起：A／B 组 ckpt 已由 `W5.6`（A5）补训就位并验收
+round_history:
+  - "IMPLEMENTATION_ROUND（2026-10-09 起）：A／B ckpt 不存在、且 A6 禁训练 ⇒ 只交付评估实现 ＋ 演练"
+  - "FULL_ROUND（2026-10-11 起）：`D-91` 裁定一 验收 A／B 补训（tag `train-ab-v1`）⇒ 四组齐备，正式评估可开"
+full_round_amendments:               # ⚠ 全部为**状态／结构化**补记，**任何判据数值与口径均未改**
+  amended_at: "2026-10-11（**早于**任何 `--source sealed` 的消融数字；既有 `ablation_dryrun_val_*` 为 val 演练稿、非权威）"
+  items:
+    - "`groups.A/B.ckpt_status`：`NOT_EXIST` ⇒ `EXIST`（实测；状态**快照**字段，非判据数值）＋ 补 `known_runs`（与 C 组同型，仅**登记**，实际以 `--group-ckpt` 传入为准）"
+    - "`discrimination.judgment_shards`：**新增**（= `rule_main`／`rule_scope` 的**结构化表述**，见该处注释）"
+    - "`round`：`IMPLEMENTATION_ROUND` ⇒ `FULL_ROUND`"
+  ratification: "**窗口提案，待 `W0` 追认**（`D-84` 裁定〇 的登记纪律：窗口只有提案权）；已登 `DEVIATION_LEDGER.md`"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 单源复用指针（**同一代码路径**，禁另写一套）
+# ─────────────────────────────────────────────────────────────────────────────
+base_config: "configs/eval/detection.yaml"                       # W6.1：inputs／record_assertions／tau／metrics／latency／memory
+reuse_module: "scripts/eval/05_01_eval_detection.py"             # W6.1：守卫／引擎／指标／写盘
+reuse_symbols:
+  guard:
+    - assert_input_allowed        # C5：**不得另写一套**白名单守卫
+    - assert_record_count
+    - resolve_input_path
+    - read_records
+    - count_records
+    - count_physical_lines
+  engine:
+    - Engine                      # C8：唯一推理实现源（内部走 04_01 的 prompt/encode/forward）
+    - load_run_meta
+    - resolve_tau_tracks
+    - assert_meta_matches_cli
+  metrics:
+    - compute_metrics             # 内部走 03_07.compute_binary_metrics／binary_counts
+    - latency_stats
+  io:
+    - write_csv_rows
+    - write_per_sample
+    - md5_file
+    - resolve_log_dir
+forbidden_rewrite:
+  - "禁止另写推理循环（须经 `05_01.Engine.score`）"
+  - "禁止另写输入白名单守卫（须经 `05_01.assert_input_allowed`）"
+  - "禁止自造 score 定义或指标实现"
+  - "**禁止调用 `04_01`／`04_02`／`04_03`（C7 不训练）**"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §1.1 四组定义（**v5 L612–L620 原文，一字不改**）
+# ─────────────────────────────────────────────────────────────────────────────
+# 体制（消融表按体制**分表**呈现；C 组阶段4 的产物含 `id`×3 ＋ `ood`×3 共 6 run）
+regimes: [id, ood]
+
+groups:
+  order: [A, B, C, D]              # §4-4：禁止按消融结果删减组或事后加组
+  source_verbatim: "SOURCE_LOCK/实验执行方案（最终版 v5）.md L612–L620"
+  seeds: [42, 123, 456]            # C2：A／B／C／D **全部 3 个种子**，不得只跑单 seed
+  report_aggregate: "mean ± std（3 seeds）"    # v5 L622
+  A:
+    label: "仅原始数据，无编码增强"
+    verbatim: "A：仅原始数据，无编码增强。"
+    ckpt_status: "EXIST"           # ✅ 2026-10-11 起（`W5.6` 补训，`D-91` 裁定一 验收）
+    train_owner: "`W5.6`（A5）补训，2026-10-11 验收通过（`D-91` 裁定一，tag `train-ab-v1`）"
+    needs_training: false
+    known_runs:                    # A 组接线用（仅**登记**；实际以 `--group-ckpt` 传入为准）
+      - {regime: id, seed: 42,  run_dir: "checkpoints/ours/04_01_llamaguard1b_A_id_seed42_20261009-170921"}
+      - {regime: id, seed: 123, run_dir: "checkpoints/ours/04_01_llamaguard1b_A_id_seed123_20261009-215428"}
+      - {regime: id, seed: 456, run_dir: "checkpoints/ours/04_01_llamaguard1b_A_id_seed456_20261010-075719"}
+  B:
+    label: "编码增强 ＋ 普通随机增强，无课程学习"
+    verbatim: "B：编码增强 + 普通随机增强，无课程学习。"
+    ckpt_status: "EXIST"           # ✅ 2026-10-11 起（`W5.6` 补训，`D-91` 裁定一 验收）
+    train_owner: "`W5.6`（A5）补训，2026-10-11 验收通过（`D-91` 裁定一，tag `train-ab-v1`）"
+    needs_training: false
+    known_runs:                    # B 组接线用（仅**登记**；实际以 `--group-ckpt` 传入为准）
+      - {regime: id, seed: 42,  run_dir: "checkpoints/ours/04_01_llamaguard1b_B_id_seed42_20261010-123300"}
+      - {regime: id, seed: 123, run_dir: "checkpoints/ours/04_01_llamaguard1b_B_id_seed123_20261010-164634"}
+      - {regime: id, seed: 456, run_dir: "checkpoints/ours/04_01_llamaguard1b_B_id_seed456_20261010-212011"}
+  C:
+    label: "编码增强 ＋ 课程学习（**v1 配方**；不含 `P-K'` 去混淆）"
+    verbatim: "C：编码增强 + 课程学习，完整方法。"
+    # 【2026-10-22 · `D-149` 换代清单 ④】C 组的 `known_runs` 是 **v1（2026-10-05～07）** 的 6 个 ckpt：
+    # 该实验 2026-10-11 完成，**早于** v2 的「`P-K'` 2×2 对角去混淆」重训（2026-10-19～21）。
+    # ⇒ 本消融的「完整方法」= **v1 配方**，不是论文的最终 Ours（v2）。**不得**把 C 组当作 v2 的消融基线；
+    # 「v2 相对 C 的单变量差异 = 去混淆本身」，其效应见 `reports/analysis/mechanism_v1.0_20261022-110225.md`
+    # （编码良性 FPR 82.62%→1.92%／80.15%→21.34%）与 `D-140`／`D-144`。若须 v2 口径的 A/B/C，需重训（≈27 h，未批准）。
+    ckpt_status: "EXIST"           # ✅ 阶段4 的 6 个 run（id×3 ＋ ood×3）
+    train_owner: "阶段4（已关闭，tag `train-ours-v1`）"
+    needs_training: false
+    known_runs:                    # C 组接线用（`W6.1` §15.2 权威清单；仅**登记**，实际以 `--group-ckpt` 传入为准）
+      - {regime: id,  seed: 42,  run_dir: "checkpoints/ours/04_01_llamaguard1b_id_seed42_20261005-150806"}
+      - {regime: id,  seed: 123, run_dir: "checkpoints/ours/04_01_llamaguard1b_id_seed123_20261006-010210"}
+      - {regime: id,  seed: 456, run_dir: "checkpoints/ours/04_01_llamaguard1b_id_seed456_20261006-120248"}
+      - {regime: ood, seed: 42,  run_dir: "checkpoints/ours/04_01_llamaguard1b_ood_seed42_20261007-144100"}
+      - {regime: ood, seed: 123, run_dir: "checkpoints/ours/04_01_llamaguard1b_ood_seed123_20261007-180342"}
+      - {regime: ood, seed: 456, run_dir: "checkpoints/ours/04_01_llamaguard1b_ood_seed456_20261007-202634"}
+  D:
+    label: "载体消融，纯文本 vs 代码载体"
+    verbatim: "D（可选）：载体消融，纯文本 vs 代码载体。"
+    optional: true                 # v5 原文标「（可选）」
+    ckpt_status: "DERIVED_FROM_C"  # §1.3：**同一 ckpt × 按载体分组评估** ⇒ 不需新训练
+    implementation: "评估侧按 `carrier_type` 分组，**不改变训练输入**"
+    ckpt_inherit_from: "C"         # 未显式给 `--group-ckpt D=` 时沿用 C 的 ckpt（报告须**显式声明**）
+    inherit_declaration: "D 组未单独训练；其指标由 **C 组同一 ckpt** 按 `carrier_type` 分层评估得出（`W6.7` §1.3）。**该复用只适用于 D 组**；A／B 组**严禁**以任何形式复用 C 组 ckpt 或结果。"
+    needs_training: false
+  missing_group_policy:
+    render: "<TBD>"
+    note: "未训练／未就绪"
+    forbid_silent_skip: true       # §2：缺组 ⇒ 该组整列 `<TBD>` ＋ 显式标注，**不得**静默跳过
+    forbid_substitute: "**禁止**用 C 组结果代替 A／B（`W6.7` §4-1）"
+  alias_guard:
+    enabled: true
+    forbid_groups: [A, B]          # A／B 的 run_dir 若与 C 组**任一** run_dir 相同 ⇒ **非零退出**（结构性防冒充）
+    allow_groups: [D]              # D 组复用 C 组 ckpt 属 §1.3 明定口径 ⇒ 允许，但须声明
+    on_violation: "nonzero_exit_and_stop_for_W0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# **`#69` 区分度判据（`D-88` 裁定一，事前定值；`W6.7` 完整轮必办）**
+# ─────────────────────────────────────────────────────────────────────────────
+# ⛔ **红线（`D-88` 裁定三，三条）**：① 不得因「区分度不足」改训练口径；
+#   ② 不得改判据本身（含放宽 `ε`／换指标／换分片／换 τ 档）；③ 不得选择性报告。
+#   判据一旦落盘即为定值 —— 本块**只可被读取，不得按结果改写**。
+discrimination:
+  mandate: "转交项 `#69`（`D-88` 裁定六）⇒ `W6.7` 完整轮出数后**逐条执行** `D-88` 裁定一"
+  decided_at: "2026-10-10（**早于** `W6.7` 完整轮的任何评估数字 ⇒ 属**事前定值**，`D-88` 〇）"
+  eps: 0.01                        # `D-88` 裁定一 ③：`ε = 0.01`（1 个百分点）
+  eps_rationale: "`id_test` 的 F1 已在 `1.0000` 附近饱和，`±0.01` 是 n=1583 规模下肉眼与统计上均不构成可声称差异的保守带；同一 `ε` 覆盖 FPR，避免「F1 饱和掩盖 FPR 差异」"
+  groups_in_scope: [A, B, C]       # `D-88` ①：A／B／C 三组（**不含 D** —— D 与 C 同 ckpt，恒无差异）
+  metrics: [f1, fpr]               # `D-88` ①(a)(b)：`id_test` 的 **F1** 与 **FPR**
+  tracks: [star, fixed050]         # `D-88` ②「越档」：两个 τ 档**任一档**出现 ≥ε 差异 ⇒ 即认定有区分度
+  rule_main: "`id_test` 主判据 = 同 τ 档内，**同时**满足 (a) 三组 F1 的 3-seed `mean` 极差 < ε **且** (b) 三组 FPR 的 3-seed `mean` 极差 < ε"
+  rule_scope: "判「整体有区分度」的证据**不限于** `id_test`：`g3_hard_negative_test` 的 FPR 三组 `mean` 极差 ≥ ε ⇒ 即认定有区分度；`clean_original_test`（归 `04_04`／`W6`）同"
+  rule_combined: "**仅当**「`id_test` 主判据成立（两个 τ 档均成立）」**且**「② 各项**均无** ≥ ε 的差异」时 ⇒ 判「**`id` 体制消融无区分度**」"
+  verdict_is_trigger: "判「无区分度」是**触发条件、不是结论** ⇒ 须**呈 `W0`** 申请扩 `ood` 消融（`D-88` 裁定二：A／B 各 3 seeds ≈ **27 h**，`D-91` 裁定二 工时实测刷新；**须用户明批**，本窗口**不得**自行扩训）"
+  # ⚠ **`judgment_shards` —— `rule_main`／`rule_scope` 的「结构化表述」**（**数值与口径未变**，
+  #   只是把 §二 已写死的「分片 × 指标」格位集改成**机器可判读**形态）。
+  #   **补记时点 = 2026-10-11，早于任何 `--source sealed` 的消融数字**
+  #   （既有 `ablation_dryrun_val_*` 为 `--source val` 演练稿、非权威）⇒ **不构成事后择优**（`D-88` 裁定三）。
+  #   为何必须有：判据的「格位集」若跟着**当前跑到哪个分片**走，则
+  #     ① 跑 `g3_hard_negative_test` 那一轮会**只看到 `g3`**（裁定一① 的 `id_test` 主判据**整条缺**）；
+  #     ② 跑 `in_regime_test` 那一轮若 companion 未就绪，会把「**未看 `g3`**」误判成「**无区分度**」
+  #        ⇒ **假触发** `D-88` 裁定二（属「换分片」类错误，`D-88` 裁定三-2 明禁）。
+  #   ⇒ 故格位集**与跑到哪个分片无关**；数据两处皆无 ⇒ 渲染 `<TBD>` ＋ 标「待 companion 轮」，
+  #     并计为**待判读**；**存在待判读格位时不得判「无区分度」**。
+  judgment_shards:
+    - {shard: "id_test",               metrics: [f1, fpr], role: "main"}   # 裁定一 ①(a)(b)
+    - {shard: "g3_hard_negative_test", metrics: [fpr],     role: "scope"}  # 裁定一 ②（全负分片 ⇒ 只取 FPR）
+  judgment_shards_note: "`clean_original_test` **不列入**本集合 —— 归 `04_04`／`W6`，已由 `not_evaluated` 如实登记 ⇒ 综合判定**不覆盖**该项，且**不因该项缺失而阻断**结论。"
+  pending_blocks_no_diff: true     # 存在待判读格位 ⇒ **不得**判「无区分度」（防「换分片」式假触发）
+  not_evaluated:                   # **如实登记**未能纳入的判据项（`D-88` ②）
+    - "`clean_original_test`（44）⇒ 归 `04_04`／`W6` 的 A6 侧，**本窗口不评估**（`W6.1` §1.3 同型：避免两处口径打架）⇒ 该项**未纳入**判定，须由 `04_04` 结果补齐"
+  companion:                       # 跨分片取数（`05_03` 的 `decay.id_reference.artifacts` 同型机制）
+    written_before_run: true       # 指针在**该轮起跑前**落盘（指向已产出的他分片 CSV），非事后填数
+    written_at: "2026-10-11T08:45+08:00（`in_regime_test` 轮**起跑前**；指向同轮先跑完的 `g3` 轮权威产物 ts `20261011-083600`）"
+    artifacts:
+      - "reports/eval/ablation_v1.0_20261011-083600.csv"   # g3 轮（`--split g3_hard_negative_test`）消融表
+    select_fields: [group, regime, seed, shard, tau_track, tpr, fpr, f1, auroc]
+    on_missing: "另一分片的格位渲染 `<TBD>` 并显式标注「待 companion 轮」⇒ **不得**静默当作 0"
+    regime_layer_required: true    # ⚠ `g3` 分片在 `id`／`ood` 下**指同一份 CSV** ⇒ 取数必须先按 `regime` 分层、再按 seed 去重，否则 3-seed `mean` 变成跨体制混算
+
+# ─────────────────────────────────────────────────────────────────────────────
+# **A／B／C 组训练配方（`D-84` 裁定一 追认）＋ 「读法一」强制披露（条件 2）**
+# ─────────────────────────────────────────────────────────────────────────────
+group_recipe:
+  source: "`D-84` 裁定一（`W5.6` 的 `P-3` 读法一 追认）"
+  A: {augment: "off", curriculum: "off", cli: "--augment off --curriculum off", model_key: "llamaguard1b_A"}
+  B: {augment: "on",  curriculum: "off", cli: "--augment on --curriculum off",  model_key: "llamaguard1b_B"}
+  C: {augment: "on(OR)", curriculum: "on", cli: "--curriculum on", model_key: "llamaguard1b"}
+  augment_or_semantics: "`--augment` 的**生效式 = `(--curriculum on) ∪ (--augment on)`**（OR 语义）⇒ `--curriculum on` 单独使用（C 组历史命令）**逐字不变**"
+  ladder: "A→B→C 为**单因素阶梯**：A vs B 差「有无增强」；B vs C 差「有无课程调度」"
+  regime_scope: "**仅 `id` 主体制 × A／B 各 3 seeds = 6 run**（`D-84` 裁定五：**不扩** `ood`；`v5 §5.6` 只要求 3 seeds）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C1 统一划分（`v5 新增 32`，硬性）
+# ─────────────────────────────────────────────────────────────────────────────
+split_identity:
+  enabled_by_flag: "--check-split-identity"
+  rule: "所有消融组必须使用**完全相同**的数据集划分；**不得**每组随机重新划分"
+  source: "SOURCE_LOCK/实验执行方案（最终版 v5）.md L624–L634（新增 32）；`PREREG_v1.md` §5 补录（G6）"
+  fingerprint:
+    method: "逐行 `text` 的 `sha256` 序列哈希"
+    detail: "对喂入引擎的**实际 rows 序列**，逐行取 `sha256(text)`，再对拼接后的摘要串取 `sha256` ⇒ 序列**逐位**敏感（顺序变化也会变）"
+    fields: [group, regime, seed, shard, n_records, n_pos, n_neg, fingerprint]
+    empty_text_policy: "空 `text` 以 `sha256('')` 参与（不跳过，避免静默错位）"
+  compare: "**同一 `(regime, shard)` 之内**，四组（含 D）须**逐位相同**（比对作用域由上方 `fields` 的 `regime`／`shard` 决定 ⇒ **跨体制／跨分片不作比对**）；任一不同 ⇒ **非零退出 ＋ 停工呈 W0**"
+  on_mismatch: "nonzero_exit_and_stop_for_W0"
+  artifact: "reports/eval/ablation_split_identity_v1.0_<ts>.csv"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C4 τ 口径：**不重寻**
+# ─────────────────────────────────────────────────────────────────────────────
+tau:
+  per_run: true                    # **逐组逐 seed** 取该 run `best epoch` 的 `tau_ours`（全精度）
+  full_precision: true             # `F-W5.1-2`：不取显示值
+  source_field: "tau_ours"         # 读 `best.json` → ckpt `meta.json`
+  parallel: 0.5                    # `0.5` 并列（`D-47` 裁定二／`D-53` 裁定三）
+  reseek_forbidden: true           # **禁止**为让消融好看而统一 τ 或改 τ（会引入额外自由度 ⇒ 消融不可比）
+  unify_forbidden: true            # **禁止**跨组统一 τ
+  main_criterion: "主口径 = `0.5` **iff** `tau_main_override is True`，否则 = `tau_ours`（只读取与判定式应用，`05_01.resolve_tau_tracks`）"
+  recompute_trigger_forbidden: true
+  source_single: "05_01.resolve_tau_tracks（**禁**在 `05_06` 内重算或另寻）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C7 指标与 C3 `mean ± std` 退化口径
+# ─────────────────────────────────────────────────────────────────────────────
+metrics:
+  primary: [tpr, fpr, f1, auroc]
+  latency: [mean_ms, median_ms, p95_ms]
+  memory: [load_peak_mib, infer_peak_mib]
+  span_f1: "n/a"                   # Ours 为生成式二分类、无 span 输出 ⇒ **不适用**（非缺失）
+  nan_rules:
+    fpr_undefined_when: "n_neg == 0"
+    auroc_undefined_when: "n_pos == 0 或 n_neg == 0"
+    f1_undefined_when: "n_pos == 0（全负分片的 F1 无定义，不得读作 0）"
+    render_as: "n/a"
+  aggregate:
+    mean_std: true                 # v5 L622；`D-47` 裁定四
+    ddof: 1                        # 样本标准差（`W6.4`／`W6.9` 同口径）
+    per_seed_raw_table: true       # 一律给逐 seed 原值表
+    std_zero_declaration_slot: true
+  std_zero:
+    rule: "某格 `std = 0` ⇒ **显式声明退化**，**禁止**只写 `mean ± std`"
+    declaration: "该格 3 个 seed 取值完全相同 ⇒ `std = 0`，属**退化**读数（非「方差小」）；不得据此声称稳定性。"
+  variance_policy:
+    source: "v5 L630–L634（新增 32）"
+    rule: "多 seed 方差过大 ⇒ 检查训练／数据；调超参；**如实报告标准差，不强行追求小 std**"
+    forbid: "**禁止**只报好看的 seed（`W6.7` §4-5）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C6 记录数断言（取自 `W6.1` 的 detection.yaml，**禁改**）
+# ─────────────────────────────────────────────────────────────────────────────
+record_count_policy:
+  source: "configs/eval/detection.yaml → record_assertions（**禁改**）"
+  keys_in_scope: [regime_id_test, regime_ood_test, g3_hard_negative_test, id_val, ood_val]
+  expected: {regime_id_test: 1583, regime_ood_test: 740, g3_hard_negative_test: 64, id_val: 1584, ood_val: 927}
+  on_mismatch: "stop_and_escalate_W0（**禁改断言值**）"
+  must_use: "csv.DictReader（经 05_01.read_records；封存 CSV 的 `text` 含换行 ⇒ 行数 ≠ 记录数）"
+  line_regression: {records_expected: 1, lines_at_least: 3}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# D 组载体分层（`--carrier-strata`）
+# ─────────────────────────────────────────────────────────────────────────────
+carrier:
+  enabled_by_flag: "--carrier-strata"
+  group_by_column: "carrier_type"
+  values: [text, code]             # `DATA_CARD_CodeObf-PI_v1.0.md` §「`carrier_type`」行：`text`（载荷本体）／`code`（嵌入宿主代码后的完整文本）
+  source: "DATA_CARD_CodeObf-PI_v1.0.md（`carrier_type` 字段说明行）"
+  denominators:
+    tpr: "该层内 `label==1` 的样本"
+    fpr: "该层内 `label==0` 的样本"
+    f1: "该层内正负样本并集"
+  absent_layer_policy: "某层在该分片上 n=0 ⇒ **显式列出**且指标渲染 `n/a`（不静默省略、不填 0）"
+  artifact: "reports/eval/ablation_carrier_v1.0_<ts>.csv"
+  on_mismatch: "record_as_is_and_escalate_W0"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C5 输入面（实现期只读 val）
+# ─────────────────────────────────────────────────────────────────────────────
+input_policy:
+  implementation_phase:
+    allowed_source: [val]
+    forbidden: ["data/sealed_test/**", "data/frozen/CodeObf-PI_v1.0/splits/*/test.csv"]
+  formal_phase:
+    allowed_source: [sealed]
+    require: ["--split", "--access-log-note"]    # 缺一即拒绝执行并非零退出
+  access_log_columns: [日期, 窗口, 用途, 命令, 输出路径, 复核人]
+  script_writes_access_log: false                # 登记由**人**手工完成；脚本只回显 note
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 声明句（**逐字**落报告；不得弱化、不得改写成中性表述）
+# ─────────────────────────────────────────────────────────────────────────────
+declarations:
+  reading_disclosure:               # `D-84` 裁定一 **条件 2**（**强制显著披露**，逐字）
+    - "**消融 B 组「普通随机增强」的读法声明**：`v5 §5.6` 字面为「**编码增强 ＋ 普通随机增强**」**两项**，本读法**合并为一项** —— 「普通随机增强」= 既有「编码感知增强」（`04_02.augment_attack`，二次编码、`p=0.30`、`ratio_cap=1.25`）在**无课程调度**下的随机施加形态，**不新造组件**。"
+    - "**不得**声称该读法与 `v5` 字面**完全一致**；已写入 `PREREG` 补齐件（`D-84` 裁定一 条件 1／`D-85` 裁定一：须 `W1.1` 复核签署 ＋ tag `prereg-v1.7` 之后方可起跑）。"
+  ab_not_trained:
+    - "**A 组与 B 组的 ckpt 不存在**（`W6` 实测 `checkpoints/ours/` 无任何消融组目录），且其训练须由 **A5 侧**产出 ⇒ 本窗口（A6）**无权训练**。"
+    - "本轮 A／B 两组的全部数字一律为 `<TBD>`，标注「**未训练／未就绪**」；**未**以任何形式用 C 组结果代替。"
+  no_substitute:
+    - "**禁止**伪造或外推 A／B 组数字；**禁止**用 C 组结果代替 A／B（`W6.7` §4-1）。"
+  no_training:
+    - "本窗口对 `04_01`／`04_02`／`04_03` 的**调用次数 = 0**；只做**推理评估**（C7）。"
+  split_identity:
+    - "所有消融组使用**完全相同**的数据集划分；**不得**每组随机重新划分（`v5 新增 32`）。"
+  tau_not_reseek:
+    - "τ **逐组逐 seed** 取该 run `best epoch` 的 `tau_ours`（全精度），`0.5` 并列；**未**为消融统一 τ、亦**未**重新寻优 τ。"
+  std_zero:
+    - "若某格 `std = 0` ⇒ 该格 3 个 seed 取值完全相同，属**退化**读数；已逐 seed 列出原值，**不得**据此声称稳定性。"
+  variance:
+    - "多 seed 方差过大时：**如实报告标准差，不强行追求小 std**（`v5 新增 32`）。"
+  d_group:
+    - "D 组按「**同一 ckpt × 按 `carrier_type` 分组评估**」实现（`W6.7` §1.3）⇒ **不需要新训练**；若 W0 改裁为「仅单载体训练的变体」则须先补训练。"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 产物与报告骨架（§6／§7.3）
+# ─────────────────────────────────────────────────────────────────────────────
+report:
+  skeleton_sections:
+    - "§1 概述与四组定义（v5 L612–L620 原文）"
+    - "§2 消融总表（组 × 体制 × 指标 mean ± std）＋ 逐 seed 原值表 ＋ `std=0` 退化声明"
+    - "§3 τ 口径（逐组逐 seed 的 `tau_ours` 全精度 ＋ 并列 0.5；**不重寻**声明）"
+    - "§4 统一划分一致性（`--check-split-identity` 指纹表）"
+    - "§5 载体分层（D 组；`--carrier-strata`）"
+    - "§6 延迟与显存（与 `BASELINE_REPORT.md` §1 逐列同构；须带其 §12 口径注释）"
+    - "§7 ACCESS_LOG 与冻结面复核"
+    - "§8 局限与回退声明位"
+    - "§9 回执／验收位（留给 W6 复核）"
+    - "附 可直接搬入 `reports/eval/EVAL_REPORT.md` 的 §5.6 骨架段"
+  artifacts:
+    # P-2（`D-83` 裁定九·P-2）：**两档命名** —— 与本文件同源的声明须反映实际落盘命名。
+    #   `--source sealed` ⇒ `ablation_v1.0_<ts>.{md,csv}`（**正式**）
+    #   `--source val`    ⇒ `ablation_dryrun_val_v1.0_<ts>.{md,csv}`（**演练**；须与非权威稿自标规则一致，
+    #                        `PROJECT_CONTRACT.md` §2-9）
+    # 源码实现见 `scripts/eval/05_06_eval_ablation.py` 的 `cmd_eval()`：
+    #   `name = "ablation" if source != "val" else "ablation_dryrun_val"`
+    report_md: "reports/eval/ablation_v1.0_<ts>.md（正式）／ reports/eval/ablation_dryrun_val_v1.0_<ts>.md（演练）"
+    report_csv: "reports/eval/ablation_v1.0_<ts>.csv（正式）／ reports/eval/ablation_dryrun_val_v1.0_<ts>.csv（演练）"
+    split_identity_csv: "reports/eval/ablation_split_identity_v1.0_<ts>.csv"
+    carrier_csv: "reports/eval/ablation_carrier_v1.0_<ts>.csv"
+    per_sample_dir: "reports/eval/outputs/"
+    log: "logs/eval/05_06_eval_ablation_<ts>.log"
+  append_only: true                # C11：只追加，不覆盖
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C10 引数带口径
+# ─────────────────────────────────────────────────────────────────────────────
+baseline_citation:
+  rule: "引 `BASELINE_REPORT.md` 须带其 **§12 口径注释**"
+  source: "reports/baseline/BASELINE_REPORT.md（tag `baseline-v1`）"
+  rerun_forbidden: true            # C13：不重跑 B1–B5

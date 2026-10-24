@@ -1,0 +1,62 @@
+{
+  "png": "fig6_detector_comparison_v1.0_20261023-231500.png",
+  "coord_origin": "top-left",
+  "note": "regions = [col0,row0,col1,row1] as image-array indices (row grows downward); text_rects are matplotlib display coords (origin bottom-left, y up)",
+  "style": "r8/D-180 §9.10B",
+  "ts": "20261023-231500",
+  "data": {
+    "detectors": [
+      "B1",
+      "B2",
+      "B3",
+      "B4",
+      "B5",
+      "B6",
+      "Ours v2\n(fixed050)"
+    ],
+    "id_tpr": [
+      "0.7778",
+      "1.0000",
+      "0.9672",
+      "0.7045",
+      "0.3965",
+      "0.0063",
+      "0.9966"
+    ],
+    "ood_tpr": [
+      "1.0000",
+      "1.0000",
+      "0.9432",
+      "0.8864",
+      "0.3835",
+      "0.0057",
+      "0.8125"
+    ]
+  },
+  "measurements": {
+    "legend_ciede2000": {
+      "id_test x ood_test": 42.2
+    },
+    "label_overlap": 0,
+    "label_out_of_axes": 0,
+    "legend_x_bar": 0
+  },
+  "subscript_check": {
+    "id_test": true,
+    "ood_test": true
+  },
+  "artifacts": [
+    {
+      "name": "fig6_detector_comparison_v1.0_20261023-231500.png",
+      "sha256": "a3751b4bdc33adf4f056835e902c1c8eb8abd0318905b52a8612d298111c30be"
+    },
+    {
+      "name": "fig6_detector_comparison_v1.0_20261023-231500.svg",
+      "sha256": "7b7bd5ccf3e029b569daf3e79b944e2f6d6c8cc39245df9fea04726cbc97f1e5"
+    },
+    {
+      "name": "fig6_detector_comparison_v1.0_20261023-231500.pdf",
+      "sha256": "5e6249401b8ed4dc4875fc9558e048d4cf36818153905eb1e6b03995790a38c9"
+    }
+  ]
+}

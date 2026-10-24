@@ -1,0 +1,253 @@
+# configs/baseline/b5_llamaguard8b.yaml — W4.5 B5（Llama-Guard-3-8B **4-bit 原始推理**）加载与推理参数载体
+#
+# 冻结依据：`windows/W4.5_b5_lg8b.md` §0.3（W4 冻结）；接口 `windows/W4.6_unify.md` §1.3／§2／§3。
+# 本文件是 B5 **加载与推理参数的唯一配置载体**：权重路径与 rev、`4bit-nf4`／cuda／`eager`、
+# 512 token 左截断、官方 chat 模板、判词首行首词映射、生成参数、显存与延迟记录项、
+# 以及 **§0.4 口径对齐（D-34 转交项 40）**／**§0.5 两叙事预案**／**§0.6 ASCII 降级预案**／**§3 OOM 回退阶梯**。
+#
+# 硬约束（`windows/W4.5_b5_lg8b.md` §0.7）：
+#   1. 只读 `text` 列；`text_sha256` 输入一致性；
+#   2. 读 `sealed_test` 前登记 ACCESS_LOG（6 列），读后复核 md5；
+#   3. 无阈值（判词二值）；`score` 留空；AUROC 记 `n/a`；
+#   4. 冒烟阶段抽 1 条样本双跑比对判词逐字一致（全量 G-DET 已由 W2.3 冻结）；
+#   5. 显存记录：加载态/推理态峰值；每次 OOM 触发回退须登记；
+#   6. 未实现处 `NOT_IMPLEMENTED` + `sys.exit(0)`；顶层不 import 重型库。
+#
+# 读取约定：脚本在函数体内惰性 `import yaml`／`import torch`，保证 `make check` 探针轻量
+# （顶层不 import 重型库，`AGENTS.md` §3／`windows/W4.6_unify.md` §0.2-7）。
+
+version: "1.0"
+detector: b5
+detector_name: "Llama-Guard-3-8B（4-bit 原始推理，不微调）"
+frozen_by: "windows/W4.5_b5_lg8b.md §0.3"
+declared_at: "2026-10-03"
+role: baseline_b5_raw_inference_4bit
+
+# ---------------------------------------------------------------------------
+# §0.3 权重（provenance 三方：`ENV_LOCK.md` §5／§6）
+# ---------------------------------------------------------------------------
+weights:
+  key: llamaguard3-8b                 # `ENV_LOCK.md` §5／§6 的登记键
+  repo_id: "meta-llama/Llama-Guard-3-8B"
+  hf_revision: "7327bd9f6efbbe6101dc6cc4736302b3cbb6e425"
+  source_channel: modelscope          # 魔搭 `LLM-Research/Llama-Guard-3-8B`（`D-07`）
+  source_repo_id: "LLM-Research/Llama-Guard-3-8B"
+  local_path: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-8B"
+  provenance_file: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-8B/PROVENANCE.json"
+  local_files_only: true              # 禁止触网
+  exclude_prefixes: ["original/"]     # `D-11`：排除 original/*（8B 侧 16.06 GB）
+  finetuned: false                    # **B5 = 原始权重**；微调版归 W5（Ours）
+  gdet_logits_md5: "191334ae4bed6779145b05e82bb93891"   # W2.3 冻结的 G-DET logits md5
+  gbnb_quant_digest: "115b9f6a…ae1e1d55"                # W2.3 冻结的 G-BNB 量化 digest
+
+# ---------------------------------------------------------------------------
+# §0.3 加载（`ENV_LOCK.md` §6／§6.2：`4bit-nf4`／cuda／eager）
+# ---------------------------------------------------------------------------
+load:
+  mode: 4bit-nf4                      # bitsandbytes NF4
+  device: cuda
+  device_map: {"": 0}
+  attn_implementation: eager          # **全阶段约定，禁 flash attention**（`ENV_LOCK.md` §0.4／§6）
+  dtype: bfloat16                     # 与 `ENV_LOCK.md` §7.2 的实测 dtype 一致
+  quantization:
+    load_in_4bit: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_compute_dtype: bfloat16
+  forbidden_attn: ["flash_attention_2", "sdpa"]
+  eval_mode: true                     # `model.eval()`（G-EVAL；`AGENTS.md` §6-11）
+  no_grad: true                       # `torch.no_grad()` 硬断言
+  oom_risk: "real"                    # `ENV_LOCK.md` §6.2／§8：8 GB 卡余量紧张，OOM 风险真实
+
+# ---------------------------------------------------------------------------
+# §0.3 输入：原文直通 → 官方 tokenizer → **512 token／左截断**（保尾部）
+# ---------------------------------------------------------------------------
+input:
+  column: text                        # `DATA_CARD` §3：阶段3–5 的唯一输入字段
+  pass_through: true                  # §1.2 原文直通：不清洗／不归一／不改大小写
+  max_seq_tokens: 512                 # §1.3 最大序列长度（与门禁 4 一致）
+  truncation_side: left               # 保尾部 512 token
+  truncation_applied_to: sample_text  # 见本报告 §截断口径声明
+  add_special_tokens: false           # chat 模板已含 <|begin_of_text|>；与 `03_06` 同口径
+  tokenizer_local_files_only: true
+
+# ---------------------------------------------------------------------------
+# §0.3 prompt：**Llama-Guard-3 官方 chat 模板原样使用**
+# ---------------------------------------------------------------------------
+prompt:
+  template_source: official_chat_template   # tokenizer_config.json 的 chat_template
+  apply_chat_template: true
+  add_generation_prompt: true
+  role: user
+  # **官方消息格式（8B）**：8B 的 chat_template 对 `message['content']` **直接 `.strip()`**
+  #   （`{{ role + ': ' + content.strip() + '\n\n' }}`），故 `content` 必须是**普通字符串**。
+  #   与 1B **不同**（1B 用 `selectattr('type','equalto','text')` 按内容块列表渲染，见 b3 yaml）；
+  #   8B 若误传列表，Jinja 抛 `'list object' has no attribute 'strip'`（响铃，非静默退化）。
+  content_format: plain_string
+  template_trims_content: true        # 官方模板自带 `content.strip()`（属其管线，如实披露）
+  categories: default_from_template   # S1–S13 由官方模板自带，不覆写
+  project_side_prompt_engineering: false    # **禁止**任何项目侧 prompt 工程（B5 = 原始推理基线）
+  empty_conversation_guard: true      # 截断后内容为空（全空白）即抛错（防退化判词静默通过）
+
+# ---------------------------------------------------------------------------
+# §0.3 生成（确定性贪心；无采样）
+# ---------------------------------------------------------------------------
+generation:
+  do_sample: false                    # 贪心解码（确定性）
+  max_new_tokens: 20                  # 判词形如 `unsafe\nS1`／`safe`，20 token 足够
+  num_beams: 1
+  temperature: null                   # 不设（do_sample=false）
+  top_p: null
+  pad_token_id_from: eos_token_id
+  decode_skip_special_tokens: true
+  seed: 42                            # 与 `ENV_LOCK.md` §7.2 的确定性配置同源
+  batch_size: 1                       # §0.5 叙事①：batch 1（8 GB 卡，禁批处理）
+
+# ---------------------------------------------------------------------------
+# §3 判词 → 二分类映射（首行首词，冻结口径）
+# ---------------------------------------------------------------------------
+mapping:
+  kind: judgment
+  rule: first_line_first_word_equals_unsafe
+  unsafe_word: unsafe                 # 首行首词 == `unsafe` ⇒ pred = 1
+  safe_word: safe                     # 首行首词 == `safe` ⇒ pred = 0
+  unparsed_counting: true             # 首行首词 ∉ {safe, unsafe} ⇒ 记 `unparsed`，**计数披露**
+  unparsed_pred: ""                   # unparsed 的 `pred` **留空**（不默认兜底为 0/1）
+  threshold: null                     # 无阈值（判词二值）
+  parse_steps:
+    - strip_whole_judgment            # 先 strip 判词整体
+    - take_first_line                 # 再取首行
+    - strip_line_and_take_first_whitespace_token
+  freeze_note: "首行首词口径冻结；`unparsed` 高时只登记计数与样例判词原文，不得自行改解析规则"
+
+# ---------------------------------------------------------------------------
+# §2 输出 schema（与 `windows/W4.6_unify.md` §2 逐列一致）
+# ---------------------------------------------------------------------------
+output:
+  directory: reports/baseline/outputs
+  filename: "b5_<split>_v1.0_<YYYYMMDD-HHMMSS>.csv"
+  columns: [sample_id, text_sha256, pred, raw_type, raw, score, latency_ms]
+  raw_type: judgment                  # §2 raw_type.b5
+  raw_semantics: "判词原文（JSON 字符串）"
+  score: null                         # §2 score_source.b5 = **留空**
+  pred: judgment_mapped               # 规则型即时映射（首行首词）
+  auroc: "n/a"                        # §4.2：B5 无连续 score ⇒ AUROC 记 n/a
+  encoding: utf-8
+  newline: lf
+
+# ---------------------------------------------------------------------------
+# §1 评估分片（三个测试分片；B5 无 τ 寻优，故不跑验证分片）
+# ---------------------------------------------------------------------------
+splits:
+  eval: [id_test, ood_test, clean_test]
+  all: [id_test, ood_test, clean_test]
+  paths_from: "configs/baseline/unify.yaml"   # 分片路径的唯一出处（W4.6 冻结）
+  sealed: true                        # 三个分片均在 data/sealed_test/ ⇒ **每次读取前登记 ACCESS_LOG**
+
+# ---------------------------------------------------------------------------
+# §0.4-6 冒烟：抽 1 条样本双跑，判词**逐字一致**
+# ---------------------------------------------------------------------------
+smoke:
+  double_run_enabled: true
+  double_run_sample: first_of_split   # 取该分片第 1 条样本
+  compare: judgment_verbatim          # 比对判词原文（不只是 pred）
+  on_mismatch: report_and_continue    # 不一致 ⇒ 如实登记（全量 G-DET 已由 W2.3 冻结，不重做）
+  note: "确定性抽检；全量 G-DET 已由 W2.3 冻结（logits md5 `191334ae4bed6779145b05e82bb93891`）"
+
+# ---------------------------------------------------------------------------
+# §0.4-7 / §4.2 显存与延迟记录
+# ---------------------------------------------------------------------------
+measurement:
+  memory:
+    metric: max_memory_allocated      # 峰值（字节；报告同时给 MiB）
+    states: [load, infer]             # 加载态与推理态分列
+    reset_between_states: true
+    env_lock_reference:               # ENV_LOCK.md §6.2／§8 实测对照
+      load_peak_mib: 5542
+      infer_8b_512_mib: 5574          # 44-token 探针输入
+      sup_infer_8b_512tok_mib: 5852   # 512-token 输入
+  latency:
+    metric: latency_ms                # 单样本处理延迟（不含模型加载）
+    excludes: [model_load, csv_io]    # §2 注：模型加载耗时单独披露，不进 latency_ms
+    stats: [mean, median, p95]
+
+# ---------------------------------------------------------------------------
+# §0.4-2 输入一致性与冻结面完整性
+# ---------------------------------------------------------------------------
+integrity:
+  text_sha256: true
+  md5_of_csv: true
+  md5sum_verify_after_read: true      # 读后复核 `md5sum -c` exit=0
+  access_log_required: true           # ACCESS_LOG.md 6 列
+
+# ---------------------------------------------------------------------------
+# §0.4 口径对齐（`D-34` 转交项 40）—— **B5 核心呈报义务**
+#
+# 二选一：choice = reuse_gate4（(a) 沿用门禁 4 口径）或 deviate（(b) 改判）。
+# W4 的口径指引（接口 v1.0 冻结）已定 B5 主口径 = **(a) 沿用门禁 4 口径**（首行首词／左截断 512）。
+# 本配置以 (a) 为默认，五要素逐项列于 `gate4_elements`，与 `DATA_CARD` §25 一致。
+# ---------------------------------------------------------------------------
+caliber_alignment:
+  choice: reuse_gate4                 # (a) 沿用门禁 4 口径
+  declaration: "与门禁 4 同口径"
+  source: "DATA_CARD §25 = windows/W3.8_freeze.md §3.6 第 25 条（D-34 转交项 40）"
+  gate4_elements:
+    detector: "llamaguard3-8b rev `7327bd9f…`（完整 `7327bd9f6efbbe6101dc6cc4736302b3cbb6e425`）"
+    quant: "4-bit（`4bit-nf4`）"
+    judgment_parse: "首行首词（strip 后首个空白分词）"
+    truncation_side: "左（512 token 上限）"
+    counting: "只按内容计数（D-00-05：MI-M 计入，MI-W/MI-B 不计入；G3 先还原再送检，G1/G2 原样送检）"
+  # 若因工程原因（OOM 回退改 256 token 等）无法沿用，须切到 (b) 并逐项写明差异与理由。
+  deviate_if:
+    - "OOM 回退改 256 token"
+    - "CPU offload 改变加载方式"
+    - "子集评估（非全量）"
+
+# ---------------------------------------------------------------------------
+# §0.5 两种结果叙事预案（v5 阶段3；W4_stage3_baseline §3.1）
+# ---------------------------------------------------------------------------
+narratives:
+  primary:
+    label: "叙事① 主档全量"
+    caliber: "4-bit / 512 token / batch 1 全量三测试集"
+    comparable: true                  # 可与门禁 4 检出率及其他检测器直接比较
+  oom_fallback:
+    label: "叙事② OOM 回退档"
+    trigger: "PROJECT_CONTRACT.md §4（256 token / batch 1 / CPU offload / 子集评估）"
+    marking: "非全量口径"
+    requirements:
+      - "显式标注「非全量口径」"
+      - "列出与主档的逐项差异"
+      - "声明不得与叙事①及其他检测器直接比较"
+
+# ---------------------------------------------------------------------------
+# §0.6 ASCII 艺术降级叙事预案（W4_stage3_baseline §3.1）
+# ---------------------------------------------------------------------------
+ascii_art:
+  degradation_risk: "多行字符画经 tokenization 后特征受损，可能系统性压低 TPR"
+  narrative: "按「编码本身可检测性边界」呈现"
+  report_subset_separately: true      # 单独列出 ascii_art 子集指标
+  must_not: [mix_into_overall_mean, judge_detector_failed_solely_on_this]
+  encoding_key: ascii_art             # 逐编码拆分的键
+
+# ---------------------------------------------------------------------------
+# §3 回退点（`PROJECT_CONTRACT.md` §4：B5 OOM）
+# ---------------------------------------------------------------------------
+fallback:
+  oom_ladder:
+    - "256 token（降低 max_seq_tokens）"
+    - "batch 1（保持单样本，禁批）"
+    - "CPU offload（device_map 加 cpu 分区）"
+    - "子集评估（限制样本数）"
+  each_level_logged: true             # 每级降档逐级登记（WINDOW_LOG 事件 + 报告内逐项声明）
+  trigger_narrative: oom_fallback     # 触发即切换到叙事②（§0.5）
+
+# ---------------------------------------------------------------------------
+# §0.4-5 clean_test 对照声明
+# ---------------------------------------------------------------------------
+clean_test:
+  rows: 44
+  all_label: 1                        # 无负样本
+  fpr: undefined                      # §4.2：FPR 无定义
+  f1_degenerate: "2*TP/(2*TP+FN)"
+  expectation: "明文恶意对原始 Llama-Guard-3-8B **可见** ⇒ clean 集预期为 B5 的**强项**；与编码分片的弱势形成对照，这正是 Ours 要填补的缺口叙事"

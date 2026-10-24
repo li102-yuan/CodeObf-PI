@@ -1,0 +1,66 @@
+{
+  "png": "fig3_ood_per_encoding_fpr_v1.0_20261023-235500.png",
+  "coord_origin": "top-left",
+  "style": "r8/D-180 §9.10B",
+  "ts": "20261023-235500",
+  "subscript_check": {
+    "ascii_art": true
+  },
+  "glyph_missing": {},
+  "v1": {
+    "hex": 1.0,
+    "morse": 0.7714,
+    "ascii_art": 0.6632,
+    "homoglyph": 0.7714,
+    "plain": 0.0
+  },
+  "v2": {
+    "hex": 0.731,
+    "morse": 0.1212,
+    "ascii_art": 0.0,
+    "homoglyph": 0.0014,
+    "plain": 0.0027
+  },
+  "rounding_note": {
+    "hex": {
+      "csv_exact": 0.731006,
+      "used_01": 0.731,
+      "delta": 6e-06
+    },
+    "morse": {
+      "csv_exact": 0.12115,
+      "used_01": 0.1212,
+      "delta": 5e-05
+    },
+    "ascii_art": {
+      "csv_exact": 0.0,
+      "used_01": 0.0,
+      "delta": 0.0
+    },
+    "homoglyph": {
+      "csv_exact": 0.001369,
+      "used_01": 0.0014,
+      "delta": 3.1e-05
+    },
+    "plain": {
+      "csv_exact": 0.002738,
+      "used_01": 0.0027,
+      "delta": 3.8e-05
+    }
+  },
+  "note": "morse v2：底稿精确 177/1461=0.121150 ⇒ 4 位小数 0.1211，01 §C 登记 0.1212（6 位小数二次舍入）。图内按 01 值作图/标注；差异 0.0001 已在 rounding_note 登记，待 W0 裁定口径。",
+  "artifacts": [
+    {
+      "name": "fig3_ood_per_encoding_fpr_v1.0_20261023-235500.png",
+      "sha256": "e26e15bf8e456fe11371a19fe19ff0b17945ed30975847ab028d1c1ed913da61"
+    },
+    {
+      "name": "fig3_ood_per_encoding_fpr_v1.0_20261023-235500.svg",
+      "sha256": "f578880287c4d4b06b2566e2b9c5b49dd75752754a2cee81efe7d5b7888bc2ed"
+    },
+    {
+      "name": "fig3_ood_per_encoding_fpr_v1.0_20261023-235500.pdf",
+      "sha256": "9c61217c7b4c96bf31aa63f263e5c1ece95ba17c34803cbb0296578164625f6c"
+    }
+  ]
+}

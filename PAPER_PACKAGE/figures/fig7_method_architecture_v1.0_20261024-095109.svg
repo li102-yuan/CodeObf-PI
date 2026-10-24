@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="459.24625pt" height="251.658668pt" viewBox="0 0 459.24625 251.658668" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-10-24T10:09:34.047445</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.1, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 251.658668 
+L 459.24625 251.658668 
+L 459.24625 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="line2d_1">
+   <path d="M 133.2 60.223236 
+L 157.2 60.223236 
+" style="fill: none; stroke: #a9601c; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="patch_2">
+   <path d="M 133.2 60.223236 
+Q 145.2 60.223236 156.305573 60.223236 
+" style="fill: none; stroke: #a9601c; stroke-width: 0.8; stroke-linecap: round"/>
+   <path d="M 153.905573 59.023236 
+L 156.305573 60.223236 
+L 153.905573 61.423236 
+z
+" style="fill: #a9601c; stroke: #a9601c; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="line2d_2">
+   <path d="M 282.16 52.542486 
+L 306.16 52.542486 
+" style="fill: none; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="patch_3">
+   <path d="M 282.16 52.542486 
+Q 294.16 52.542486 305.265573 52.542486 
+" style="fill: none; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+   <path d="M 302.865573 51.342486 
+L 305.265573 52.542486 
+L 302.865573 53.742486 
+z
+" style="fill: #1f3b73; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="line2d_3">
+   <path d="M 318.16 71.084973 
+L 239.2 125.807973 
+" style="fill: none; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="patch_4">
+   <path d="M 318.16 71.084973 
+Q 278.68 98.446473 239.935137 125.298488 
+" style="fill: none; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+   <path d="M 242.59126 124.917688 
+L 239.935137 125.298488 
+L 241.22417 122.945109 
+z
+" style="fill: #1f3b73; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="line2d_4">
+   <path d="M 372.208125 71.084973 
+L 372.208125 125.807973 
+" style="fill: none; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="patch_5">
+   <path d="M 372.208125 71.084973 
+Q 372.208125 98.446473 372.208125 124.913545 
+" style="fill: none; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+   <path d="M 373.408125 122.513545 
+L 372.208125 124.913545 
+L 371.008125 122.513545 
+z
+" style="fill: #1f3b73; stroke: #1f3b73; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="line2d_5">
+   <path d="M 237.7 162.892945 
+L 237.7 186.892945 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="patch_6">
+   <path d="M 237.7 162.892945 
+Q 237.7 174.892945 237.7 185.998518 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linecap: round"/>
+   <path d="M 238.9 183.598518 
+L 237.7 185.998518 
+L 236.5 183.598518 
+z
+" style="fill: #555555; stroke: #555555; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="line2d_6">
+   <path d="M 314.64375 162.892945 
+L 314.64375 186.892945 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="patch_7">
+   <path d="M 314.64375 162.892945 
+Q 314.64375 174.892945 314.64375 185.998518 
+" style="fill: none; stroke: #555555; stroke-width: 0.8; stroke-linecap: round"/>
+   <path d="M 315.84375 183.598518 
+L 314.64375 185.998518 
+L 313.44375 183.598518 
+z
+" style="fill: #555555; stroke: #555555; stroke-width: 0.8; stroke-linecap: round"/>
+  </g>
+  <g id="patch_8">
+   <path d="M 14 101.807973 
+L 133.2 101.807973 
+L 133.2 34 
+L 14 34 
+z
+" style="fill: #fdf4ec; stroke: #a9601c; stroke-width: 0.7; stroke-linejoin: miter"/>
+  </g>
+  <g id="patch_9">
+   <path d="M 157.2 86.446473 
+L 282.16 86.446473 
+L 282.16 34 
+L 157.2 34 
+z
+" style="fill: #edf2fa; stroke: #1f3b73; stroke-width: 0.7; stroke-linejoin: miter"/>
+  </g>
+  <g id="patch_10">
+   <path d="M 306.16 71.084973 
+L 445.24625 71.084973 
+L 445.24625 34 
+L 306.16 34 
+z
+" style="fill: #edf2fa; stroke: #1f3b73; stroke-width: 0.7; stroke-linejoin: miter"/>
+  </g>
+  <g id="patch_11">
+   <path d="M 157.2 162.892945 
+L 245.2 162.892945 
+L 245.2 125.807973 
+L 157.2 125.807973 
+z
+" style="fill: #f4f4f4; stroke: #555555; stroke-width: 0.7; stroke-linejoin: miter"/>
+  </g>
+  <g id="patch_12">
+   <path d="M 306.16 162.892945 
+L 438.25625 162.892945 
+L 438.25625 125.807973 
+L 306.16 125.807973 
+z
+" style="fill: #f4f4f4; stroke: #555555; stroke-width: 0.7; stroke-linejoin: miter"/>
+  </g>
+  <g id="patch_13">
+   <path d="M 230.2 231.658668 
+L 323.1275 231.658668 
+L 323.1275 186.892945 
+L 230.2 186.892945 
+z
+" style="fill: #f4f4f4; stroke: #555555; stroke-width: 0.7; stroke-linejoin: miter"/>
+  </g>
+  <g id="text_1">
+   <text style="font-weight: 700; font-size: 7.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #1a1a1a" x="19" y="44.015813" transform="rotate(-0 19 44.015813)">Training data (CodeObf-PI)</text>
+  </g>
+  <g id="text_2">
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(19 56.095348)">attack / benign same-source pairs</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(19 63.776098)">9 encodings × 2 carriers (code / text)</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(19 72.103348)">train codes 5:  base64 / rot13 / zerowidth</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(19 79.784098)">     / url / reverse</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(19 86.818348)">held-out codes 4:  hex / morse / ascii_art</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(19 94.499098)">     / homoglyph  -- test only</text>
+  </g>
+  <g id="text_3">
+   <text style="font-weight: 700; font-size: 7.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #1a1a1a" x="162.2" y="44.015813" transform="rotate(-0 162.2 44.015813)">2×2 diagonal de-confounding (P-K')</text>
+  </g>
+  <g id="text_4">
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(162.2 56.101348)">attack rows:   50%  →  plaintext</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(162.2 63.776098)">benign rows:   50%  →  encoded</text>
+   <!-- (breaks the 'encoding-present $\Rightarrow$ unsafe' -->
+   <g style="fill: #1a1a1a" transform="translate(162.2 71.461348)">
+    <text>
+     <tspan x="0" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">(</tspan>
+     <tspan x="2.128128" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">b</tspan>
+     <tspan x="5.323441" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">r</tspan>
+     <tspan x="7.451569" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">e</tspan>
+     <tspan x="10.28804" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">a</tspan>
+     <tspan x="13.124512" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">k</tspan>
+     <tspan x="16.319824" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">s</tspan>
+     <tspan x="18.806808" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a"> </tspan>
+     <tspan x="20.404465" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">t</tspan>
+     <tspan x="22.179993" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">h</tspan>
+     <tspan x="25.375305" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">e</tspan>
+     <tspan x="28.211777" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a"> </tspan>
+     <tspan x="29.809433" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">'</tspan>
+     <tspan x="30.960876" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">e</tspan>
+     <tspan x="33.797348" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">n</tspan>
+     <tspan x="36.992661" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">c</tspan>
+     <tspan x="39.829132" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">o</tspan>
+     <tspan x="43.024445" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">d</tspan>
+     <tspan x="46.219757" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">i</tspan>
+     <tspan x="47.995285" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">n</tspan>
+     <tspan x="51.190598" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">g</tspan>
+     <tspan x="54.38591" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">-</tspan>
+     <tspan x="56.514038" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">p</tspan>
+     <tspan x="59.709351" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">r</tspan>
+     <tspan x="61.837479" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">e</tspan>
+     <tspan x="64.67395" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">s</tspan>
+     <tspan x="67.160934" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">e</tspan>
+     <tspan x="69.997406" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">n</tspan>
+     <tspan x="73.192719" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">t</tspan>
+     <tspan x="74.968246" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a"> </tspan>
+     <tspan x="85.043566" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a"> </tspan>
+     <tspan x="86.641223" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">u</tspan>
+     <tspan x="89.836535" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">n</tspan>
+     <tspan x="93.031848" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">s</tspan>
+     <tspan x="95.518832" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">a</tspan>
+     <tspan x="98.355303" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">f</tspan>
+     <tspan x="100.483431" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">e</tspan>
+     <tspan x="103.319903" y="-0.5625" style="font-size: 6.4px; font-family: 'Times New Roman'; fill: #1a1a1a">'</tspan>
+     <tspan x="77.845903" y="-0.5625" style="font-size: 6.4px; font-family: 'STIXGeneral'; fill: #1a1a1a">⇒</tspan>
+    </text>
+   </g>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(162.2 79.143598)">      shortcut)</text>
+  </g>
+  <g id="text_5">
+   <text style="font-weight: 700; font-size: 7.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #1a1a1a" x="311.16" y="44.015813" transform="rotate(-0 311.16 44.015813)">Base model + parameter-efficient tuning</text>
+  </g>
+  <g id="text_6">
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(311.16 56.159348)">Llama-Guard-3-1B  +  QLoRA</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(311.16 64.422598)">4-bit NF4      LoRA r=16  α=32</text>
+  </g>
+  <g id="text_7">
+   <text style="font-weight: 700; font-size: 7.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #1a1a1a" x="162.2" y="135.819594" transform="rotate(-0 162.2 135.819594)">(1) Detector (Ours v2)</text>
+  </g>
+  <g id="text_8">
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(162.2 148.54982)">TPR / FPR / F1</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(162.2 155.58407)">@ fixed050 (headline) &amp; star</text>
+  </g>
+  <g id="text_9">
+   <text style="font-weight: 700; font-size: 7.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #1a1a1a" x="311.16" y="135.823785" transform="rotate(-0 311.16 135.823785)">(2) ASR chain  ×  4 downstream SLMs</text>
+  </g>
+  <g id="text_10">
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(311.16 148.54532)">6-cell:  none / b3 / Ours  ×  id / ood</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(311.16 155.58557)">judgeable-only &amp; raw (incl. NA/UNP)</text>
+  </g>
+  <g id="text_11">
+   <text style="font-weight: 700; font-size: 7.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #1a1a1a" x="235.2" y="196.908758" transform="rotate(-0 235.2 196.908758)">(3) Final risk</text>
+  </g>
+  <g id="text_12">
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(235.2 208.994293)">= conditional ASR  ×  pass rate</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(235.2 216.675043)">pass rate = 3-seed sample-level</text>
+   <text style="font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; fill: #1a1a1a" transform="translate(235.2 224.996293)">      true union</text>
+  </g>
+  <g id="text_13">
+   <text style="font-style: italic; font-size: 6px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #777777" x="14" y="28.705078" transform="rotate(-0 14 28.705078)">(a)</text>
+  </g>
+  <g id="text_14">
+   <text style="font-style: italic; font-size: 6px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #777777" x="157.2" y="28.705078" transform="rotate(-0 157.2 28.705078)">(b)</text>
+  </g>
+  <g id="text_15">
+   <text style="font-style: italic; font-size: 6px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #777777" x="306.16" y="28.705078" transform="rotate(-0 306.16 28.705078)">(c)</text>
+  </g>
+  <g id="text_16">
+   <text style="font-style: italic; font-size: 6.4px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start; fill: #555555" x="14" y="244.277418" transform="rotate(-0 14 244.277418)">v2 effect on encoded-benign FPR (id, 4 codes pooled):   82.62%  →  1.92%</text>
+  </g>
+  <g id="legend_1">
+   <g id="patch_14">
+    <path d="M 135.246734 11.818293 
+L 143.166734 11.818293 
+L 143.166734 7.198293 
+L 135.246734 7.198293 
+z
+" style="fill: #a9601c"/>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 6.6px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start" x="146.466734" y="11.818293" transform="rotate(-0 146.466734 11.818293)">attack side</text>
+   </g>
+   <g id="patch_15">
+    <path d="M 185.065391 11.818293 
+L 192.985391 11.818293 
+L 192.985391 7.198293 
+L 185.065391 7.198293 
+z
+" style="fill: #1f3b73"/>
+   </g>
+   <g id="text_18">
+    <text style="font-size: 6.6px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start" x="196.285391" y="11.818293" transform="rotate(-0 196.285391 11.818293)">defense &amp; training</text>
+   </g>
+   <g id="patch_16">
+    <path d="M 255.962797 11.818293 
+L 263.882797 11.818293 
+L 263.882797 7.198293 
+L 255.962797 7.198293 
+z
+" style="fill: #555555"/>
+   </g>
+   <g id="text_19">
+    <text style="font-size: 6.6px; font-family: 'Times New Roman', 'Nimbus Roman', serif; text-anchor: start" x="267.182797" y="11.818293" transform="rotate(-0 267.182797 11.818293)">payload &amp; evaluation</text>
+   </g>
+  </g>
+ </g>
+</svg>

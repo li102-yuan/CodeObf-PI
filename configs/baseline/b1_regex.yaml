@@ -1,0 +1,177 @@
+# configs/baseline/b1_regex.yaml — W4.1 B1 正则检测器的**特征集冻结载体**（接口 v1.0）
+#
+# 冻结依据：`windows/W4.1_b1_regex.md` §0.3（W4 冻结，随接口 v1.0）。
+# 本文件是 B1 **特征集的唯一配置载体**，与 `windows/W4.6_unify.md` §2 的 schema 配套。
+#
+# ⚠ 冻结纪律（`windows/W4.1_b1_regex.md` §0.3 第 4 条／`AGENTS.md` §6-5 精神）：
+#   **特征模式一经首次全量评估即冻结**；此后**不得事后按测试集表现增删特征**。
+#   特征集调整只依据**验证集侧证据**，且须登记 `DEVIATION_LEDGER.md`（属工程调整，非口径变更）。
+#   「回退点」（§3）：良性集误报率异常时可**收紧**模式（最小长度/上下文约束），
+#   **不得**删除特征以美化 TPR/FPR 平衡。
+#
+# 读取约定（与 `scripts/data/_common.py` 同风格）：脚本在函数体内惰性 `import yaml`，
+# 保证 `make check` 探针轻量。
+
+version: "1.0"
+detector: b1
+frozen_by: "windows/W4.1_b1_regex.md §0.3"
+declared_at: "2026-10-03"          # 特征集**事前定值**的落盘日期（先于任何全量评估）
+first_full_eval_at: "20261003-182911"   # **首次全量评估时间戳** —— 自此特征模式冻结（不随重跑改变）
+freeze_policy:
+  on_first_full_eval: frozen       # 首次全量评估后即冻结
+  allow_tighten_on_val_evidence: true   # 只允许收紧（最小长度/上下文），且须登记台账
+  allow_delete_feature: false      # 禁止删特征以美化 TPR/FPR
+  forbid_decode_before_match: true # §0.3 末条：禁止先解码再匹配（B1 是"表层特征检测器"）
+
+# ---------------------------------------------------------------------------
+# §0.3 主口径：特征集覆盖尽可能多的编码（不少于 v5 字面的 Base64／Hex／零宽三类）
+# ---------------------------------------------------------------------------
+# kind 取值：
+#   regex_count     —— 正则计数：pattern 在 text 上的匹配数 ≥ min_matches 即命中
+#   codepoint_count —— 码位计数：落在 ranges/codepoints 内的字符总数 ≥ min_count 即命中
+#   line_density    —— 符号行密度：满足「行长 ≥ min_line_len 且符号占比 ≥ min_symbol_ratio」
+#                      的行数 ≥ min_lines 即命中（§0.3 对 ascii_art 的字面口径：符号行密度）
+#
+# 全部特征**只作用于 `text` 原文**（§1.2 原文直通），不做任何解码／归一化／大小写转换。
+features:
+  - name: base64
+    kind: regex_count
+    covers: base64
+    min_matches: 1
+    # 语义：一段 ≥24 字符的 base64 字母表连续串（可带 0–2 个 '=' 填充），
+    #       且串内**至少含一个** [0-9+/]（排除纯字母串——长英文单词／标识符形似 base64）。
+    pattern: '(?<![A-Za-z0-9+/])(?=[A-Za-z0-9+/]{24,}(?:={0,2})(?![A-Za-z0-9+/=]))[A-Za-z0-9+/]*[0-9+/][A-Za-z0-9+/]*={0,2}(?![A-Za-z0-9+/=])'
+    note: "最小长度 24 与「必含 [0-9+/]」均为事前定值；真正 base64 载荷（整句）长度以百字符计，含数字/+//的概率 ≈99%（12/64 字母表占比）"
+
+  - name: hex
+    kind: regex_count
+    covers: hex
+    min_matches: 1
+    # 语义：一段 ≥24 字符的十六进制串（可带 0x/0X 前缀），且串内**至少含一个** [A-Fa-f]
+    #       （排除纯十进制长数字）。
+    pattern: '(?<![0-9A-Za-z])(?:0[xX])?(?=[0-9A-Fa-f]{24,}(?![0-9A-Za-z]))[0-9A-Fa-f]*[A-Fa-f][0-9A-Fa-f]*'
+    note: "最小长度 24（≈12 字节载荷）+ 必含十六进制字母；ASCII 明文的 hex 化串远长于此"
+
+  - name: url
+    kind: regex_count
+    covers: url
+    min_matches: 4
+    # 语义：全文出现 **≥4 个** %XX 百分号编码字节（**不要求连续**）。
+    #       实测形态（验证分片侧）：`Before%20writing%20any%20code%2C%20...`
+    #       —— 编码器只转义非字母数字字符，%XX 之间被明文单词隔开 ⇒ 「连续 4 个」判据会几乎全漏。
+    pattern: '%[0-9A-Fa-f]{2}'
+    note: "min_matches=4 = 出现次数阈值（非连续）；4 次转义已远超自然语言文本的偶发转义"
+
+  - name: zerowidth
+    kind: codepoint_count
+    covers: zerowidth
+    min_count: 1
+    codepoints: [0x200B, 0x200C, 0x200D, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064, 0x180E, 0xFEFF]
+    codepoint_names:
+      0x200B: "ZERO WIDTH SPACE"
+      0x200C: "ZERO WIDTH NON-JOINER"
+      0x200D: "ZERO WIDTH JOINER"
+      0x2060: "WORD JOINER"
+      0x2061: "FUNCTION APPLICATION（不可见）"
+      0x2062: "INVISIBLE TIMES"
+      0x2063: "INVISIBLE SEPARATOR"
+      0x2064: "INVISIBLE PLUS"
+      0x180E: "MONGOLIAN VOWEL SEPARATOR"
+      0xFEFF: "ZERO WIDTH NO-BREAK SPACE / BOM"
+    note: "零宽码位在正常文本中不出现 ⇒ min_count=1（单个即足以判为异常）"
+
+  - name: morse
+    kind: regex_count
+    covers: morse
+    min_matches: 1
+    # 语义：≥6 个「点划 token」（每 token 1–8 个点/划，可带一个 `'` 字母终止符），
+    #       以空白或 '/' 分隔；且该段内**同时含** '.'（含 '·'）与 '-'（含 U+2212）。
+    #       实测形态（验证分片侧）：`-... .' ..-.' ---' .-.' .' / .--' .-.' ..' -' ...`
+    #       —— 每个字母码后带一个 `'` 终止符，故 token 字符集须包含 `'`。
+    pattern: '(?=[.\-·−'' \t/]*[.·])(?=[.\-·−'' \t/]*[\-−])(?:[.\-·−'']{1,8}[ \t/]+){5,}[.\-·−'']{1,8}'
+    note: "6 token 为事前定值（≈6 个字母的电码）；真实载荷为整句 ⇒ 数十 token"
+
+  - name: homoglyph
+    kind: codepoint_count
+    covers: homoglyph
+    min_count: 3
+    ranges:
+      - [0x0370, 0x03FF]    # Greek and Coptic
+      - [0x0400, 0x04FF]    # Cyrillic
+      - [0x0500, 0x052F]    # Cyrillic Supplement
+      - [0x0530, 0x058F]    # Armenian
+      - [0x13A0, 0x13FF]    # Cherokee
+      - [0x1D400, 0x1D7FF]  # Mathematical Alphanumeric Symbols
+      - [0x2C00, 0x2C5F]    # Glagolitic
+      - [0xA640, 0xA69F]    # Cyrillic Extended-B
+      - [0xFF01, 0xFF5E]    # Fullwidth ASCII variants
+    note: "非常规 Unicode 范围；min_count=3 为事前定值（英文语料偶发 1–2 个希腊/西里尔字符不足以判为同形字替换）"
+
+  - name: ascii_art
+    kind: line_density
+    covers: ascii_art
+    min_line_nonws: 16
+    min_symbol_ratio: 0.8
+    min_lines: 1
+    # **符号行** 的定义（对每一行）：
+    #   - 可见字符数（去空白后） >= min_line_nonws；
+    #   - 符号占比 = 非字母数字的可见字符数 / 可见字符数 >= min_symbol_ratio；
+    # 满足的行数 >= min_lines 即命中。
+    # 分母取**可见字符**而非行长：实测形态（验证分片侧）为 `#### |     |  ## | ...`
+    # 的宽行美术字，行内空白占大头 ⇒ 以行长为分母会把真阳性的占比压到 0.4 以下而全漏。
+    note: "§0.3 字面口径 = 符号行密度；min_lines=1 取**覆盖率优先**（§0.3：特征集应覆盖尽可能多的编码）—— 实测 min_lines=3 会漏掉 9/88 的 ascii_art 样本；敏感性见运行报告 §9"
+
+# ---------------------------------------------------------------------------
+# §0.3 附报对照：v5 字面三类特征集（Base64／Hex／零宽）—— 敏感性分析（先例：B4 的 span-only 对照）
+# ---------------------------------------------------------------------------
+comparison_feature_sets:
+  v5_literal_three:
+    name: "v5 字面三类（Base64／Hex／零宽）"
+    features: [base64, hex, zerowidth]
+    purpose: "敏感性分析：只给三类会系统性压低 B1，留下『压弱基线』的口实（与 PREREG_v1.2.md §1 依据 2 同构）"
+    reporting: "仅入运行报告的对照表；**不**另出逐样本 CSV（逐样本 CSV 恒为主口径）"
+
+# ---------------------------------------------------------------------------
+# §0.3 缺省披露：`rot13`／`reverse` 无可写特征
+# ---------------------------------------------------------------------------
+not_implemented_features:
+  rot13:
+    reason: "rot13 后的文本在正则视角仍是**普通英文**（字母替换不改变字符集与形态）"
+    boundary: "§0.3 末条**禁止先解码再匹配** ⇒ 无法在不解码的前提下写出可判别特征；写『先 rot13 解码再匹配英文』即把 B1 变成另一种检测器"
+  reverse:
+    reason: "反转后的文本字符组成与自然语言**完全相同**（仅字符顺序相反）"
+    boundary: "同上；顺序型特征（如回文检测）只对整句完全反转成立，而本数据集的 `code` 载体会把反转串嵌入宿主代码，回文性被破坏 ⇒ 无可写特征"
+
+# ---------------------------------------------------------------------------
+# 参数定值的**验证集侧证据**（§3 回退点：特征集调整只依据验证集侧证据，测试集仅最终评估一次）
+# ---------------------------------------------------------------------------
+# 定值发生在**首次全量评估之前**，只用了 data/frozen/ 侧的两个验证分片（非 sealed，免 ACCESS_LOG）；
+# 未使用任何测试分片信息。探针输出留证于 logs/baseline/。
+sensitivity_probe:
+  basis: "data/frozen/CodeObf-PI_v1.0/splits/regime_id/val.csv ＋ regime_ood/val.csv（n_pos=1232／n_neg=1279）"
+  purpose: "ascii_art 的 `min_lines` 定值依据（覆盖率优先 vs 误报率）"
+  fixed_params: {min_line_nonws: 16, min_symbol_ratio: 0.8}
+  table:
+    - {min_lines: 1, ascii_art_recall: "88/88", benign_fp: "148/1279"}
+    - {min_lines: 2, ascii_art_recall: "79/88", benign_fp: "133/1279"}
+    - {min_lines: 3, ascii_art_recall: "79/88", benign_fp: "114/1279"}
+  chosen_min_lines: 1
+  chosen_reason: "覆盖率优先 —— §0.3 要求「特征集覆盖尽可能多的编码」；min_lines≥2 会漏掉 9/88 的 ascii_art 样本，而 B1 是本项目的**待超越基线**，其召回被系统性压低即为『压弱基线』"
+  also_fixed_on_val_evidence:
+    url: "原定「连续 4 个 %XX」实测只召回 2/176 ⇒ 改为「出现 ≥4 次 %XX（不要求连续）」，召回 176/176（编码器只转义非字母数字字符，%XX 之间被明文单词隔开）"
+    morse: "原定 token 字符集不含 `'` ⇒ 实测只召回 6/88；实测形态每个字母码后带 `'` 终止符，补入后召回 88/88"
+    ascii_art_denominator: "原定分母 = 行长（含行内空白）⇒ 实测召回 0/88；美术字为宽行，改以**可见字符数**为分母后召回 88/88"
+
+# ---------------------------------------------------------------------------
+# 输出（§1）：与 `windows/W4.6_unify.md` §2 schema 对齐
+# ---------------------------------------------------------------------------
+output:
+  directory: reports/baseline/outputs
+  filename: "b1_<split>_v1.0_<YYYYMMDD-HHMMSS>.csv"
+  raw_type: regex_hits        # raw = 命中特征名 JSON 列表
+  score: null                 # §2：B1 的 score 列**留空**（规则型，无连续分数）
+  pred_rule: any_feature_hit  # §3：任一特征命中 = 1（无阈值）
+  auroc: n/a                  # §4.2：无连续 score ⇒ AUROC 记 n/a（由 03_07 记）
+
+splits:
+  eval: [id_test, ood_test, clean_test]   # §1：三个测试分片

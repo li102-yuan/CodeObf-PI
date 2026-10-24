@@ -1,0 +1,135 @@
+{
+  "name": "CodeObf-PI",
+  "version": "1.0",
+  "status": "frozen",
+  "frozen_at": "2026-10-03T10:51:14+0800",
+  "freeze_script": "scripts/data/02_08_freeze_dataset.py",
+  "freeze_commit": "aea42d608da4130860c4d464113a7f4bc597aff9",
+  "counts": {
+    "rewrite_bodies": 440,
+    "attack_total": 7920,
+    "encodings": 9,
+    "carriers": 2,
+    "benign_total": 9000,
+    "benign_G1": 4500,
+    "benign_G2": 2700,
+    "benign_G3": 1800
+  },
+  "splits": {
+    "regime_id": {
+      "train": 176,
+      "val": 22,
+      "test": 22
+    },
+    "regime_ood": {
+      "train": 176,
+      "val": 22,
+      "test": 22
+    }
+  },
+  "split_ratio": "8:1:1",
+  "split_seed": 42,
+  "sealed_test": {
+    "files": [
+      "clean_original_test.csv",
+      "g3_hard_negative_test.csv",
+      "regime_id_test.csv",
+      "regime_ood_test.csv"
+    ],
+    "md5sums": "data/sealed_test/CodeObf-PI_v1.0/md5sums.txt",
+    "access_log": "data/sealed_test/CodeObf-PI_v1.0/ACCESS_LOG.md"
+  },
+  "gates": {
+    "g1_intent": {
+      "report": "g4_intent_v1.0_20261001-095615.md",
+      "rate": 1.0,
+      "threshold": 0.95
+    },
+    "g2_ast": {
+      "ast_ok": 3152,
+      "ast_failed": 0,
+      "denominator": 3152,
+      "rate": 0.0,
+      "threshold": 0.1
+    },
+    "g3_qc": {
+      "annotators": [
+        "AN-A",
+        "AN-B"
+      ],
+      "samples": 100,
+      "both_pass": 100,
+      "rate": 1.0,
+      "threshold": 0.95
+    },
+    "g4_guard": {
+      "counted": 0,
+      "n": 90,
+      "rate": 0.0,
+      "threshold": 0.05
+    },
+    "g5_group": {
+      "exit": 0,
+      "rows": 14,
+      "bad_assertions": [],
+      "products_changed": [],
+      "product_sha256": {
+        "split_assertions.csv": "c50528cf",
+        "length_distribution.csv": "14bf612e",
+        "ngram_overlap.csv": "82a94e04",
+        "ngram_controls.csv": "629051d0",
+        "family_straddle.csv": "7f705dd7"
+      }
+    },
+    "g6_length": {
+      "threshold": 0.2,
+      "worst": 0.196948,
+      "worst_at": "regime_ood/val"
+    },
+    "g7_ngram": {
+      "threshold": 0.05,
+      "role": "report_item",
+      "regime_id": 0.852003,
+      "regime_ood": 0.708482
+    }
+  },
+  "upstream": {
+    "prereg": [
+      "PREREG_v1.md",
+      "PREREG_v1.1.md",
+      "PREREG_v1.2.md",
+      "PREREG_v1.3.md"
+    ],
+    "source_lock_tag": "source-lock-v1",
+    "env_lock_tag": "env-lock-v1",
+    "env_lock_commit": "5afa574",
+    "stage2_plan": "reports/data/stage2_plan_v1.0_20260930-184841.md",
+    "window": "windows/W3.8_freeze.md"
+  },
+  "field_glossary": {
+    "sample_id": "样本唯一标识。攻击侧 `ATK-<rewrite_id 去横线>-<enc>-<carrier>`；良性侧 `BN-<G1|G2|G3>-<nnnn>`；干净原始测试 `CLN-<rewrite_id>`。全局唯一。",
+    "seed_group_id": "攻击侧**唯一划分单位**（`SG-0001` 起四位零填）；同组全部改写体、编码变体、载体变体只进一个分片。与 `seed_id` 一一对应。",
+    "benign_group_id": "良性侧**唯一划分单位**（`BG-<nnnn>`）。与 `seed_group_id` 不同源（前缀可程序判别），两者分别参与 group 级隔离。",
+    "sample_kind": "`attack` 或 `benign`；分片宽表中两类行共表。",
+    "family_id": "语义族（`FAM-AH-*`／`FAM-PKU-*`／良性填 `benign_group_id`）。**只用于登记与测量（`A14`），不是划分单位**；`family_atomic: true` 下划分单位上提为族。",
+    "rewrite_id": "改写体标识（`RW-0001`…`RW-0440`）。",
+    "seed_id": "来源种子标识（`SEED-<AH|PKU>-<nnn>`）。",
+    "source": "来源。恶意侧 `AgentHarm`／`PKU-SafeRLHF`；良性侧 `TheStack`／`CodeSearchNet`／`Alpaca`／`Wikitext`／`G3-synthetic`。",
+    "harm_category": "危害类别（攻击侧；取自 AgentHarm 的行为类别）。",
+    "benign_set": "良性子集：`G1`／`G2`／`G3`（良性行专用）。",
+    "encoding_type": "9 编码之一（封闭域，见 `encoding` 清单）。",
+    "carrier_type": "载体：`text`（载荷本体）或 `code`（嵌入宿主代码后的完整文本）。",
+    "carrier_subtype": "代码载体子型（5 值封闭域）：`py_comment`／`js_comment`／`string_literal`／`docstring`／`identifier_ast`。**`text` 载体行为空。**",
+    "host_context": "代码载体的宿主骨架标识（10 份宿主骨架之一）。",
+    "g3_business_form": "G3 业务必需形态（真值侧 11 类，合成侧按 20 场景生成）。",
+    "business_necessity_evidence": "G3 该样本「编码层业务必需」的证据文本（`Q3` 判定依据）。",
+    "plaintext": "改写体明文（未编码）。**不是**阶段3–5 的输入。",
+    "payload": "编码后载荷（未嵌入宿主）。**不是**阶段3–5 的输入。",
+    "text": "**最终送入检测器的字符串**——`text` 载体 = 载荷本体；`code` 载体 = 嵌入后的完整代码文本。**`text` 是阶段3–5 的唯一输入字段**（`PREREG_v1.md` §12.2／v5 新增 20）。所有检测器一律只读此列。",
+    "difficulty": "编码难度标签（封闭域 `low`／`medium`／`high`）。",
+    "language": "代码载体的语言（封闭域 `python`／`javascript`）。**`text` 载体无此字段。**",
+    "ast_ok": "`code_carrier.csv` 专用，**三值**：`1` = Python 载体 `ast.parse` 通过；**`-1` = JavaScript 载体（`ast.parse` 不适用）**；`0` = 解析失败。**门禁 2 的分母只含 `{0,1}` 的行**（本阶段实测 3152）。",
+    "label": "二分类标签。攻击侧恒 `1`（恶意）；良性侧恒 `0`。",
+    "passed": "`split_assertions.csv` 专用：断言结果。**`A14` 恒为 `n/a`（报告性断言，非门禁）**。"
+  }
+}

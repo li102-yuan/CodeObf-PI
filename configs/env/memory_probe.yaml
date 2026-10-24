@@ -1,0 +1,106 @@
+# configs/env/memory_probe.yaml — 阶段1 显存基线的套件定义（唯一来源）
+#
+# 归属：**W2.4**（`windows/W2.4_memory_baseline.md` §3／§4.2）。消费者：`scripts/env/01_00_smoke_env.py`
+# （W2.3 产出）——文件存在时**以本文件为准**；缺失时脚本用内置默认（与本节逐项一致）并打印 WARN。
+#
+# 硬约束（本文件的使用者须遵守）：
+#   * **一档一进程**：`01_00 --suite <档位名>` 每次调用只跑该一档，进程退出后再启动下一档
+#     （W2.4 §4.1-1）。脚本内置的族名／`all` 取值会在一进程内连跑多档，**不构成隔离证据**。
+#   * **推理峰值与微调峰值不得合并**：`kind: infer` 与 `kind: train` 的行在
+#     `ENV_LOCK.md` §8 分列（§8.1／§8.2），禁止相加或写成「总峰值」。
+#   * **每行必须携带「显存口径七元组」**（`windows/W2.3_determinism.md` §4.6）：
+#     `suite / model / load / device / batch / seq_len / offload / collector / peak / reserved / repeat / run_id`。
+#     缺任一字段的数字不得进入 `ENV_LOCK.md` §8。
+#   * 回退档**仅当对应主档 OOM 时**才测；测了才写入记录，**不得**用回退档数字顶替 OOM 档数字（§4.1-5）。
+#
+# 参数来源（**逐条标注**，禁凭记忆）：
+#   * `batch 4 / grad_accum 4 / seq_len 512 / LoRA r 16 / alpha 32 / q_proj,v_proj / lr 2e-4`
+#     —— `SOURCE_LOCK/实验执行方案（最终版 v5）.md` **L434**（阶段4 正式训练配置）；
+#   * `8B 4-bit`（B5 检测器）—— v5 **L370**；
+#   * `unplug-tiny CPU 推理`（B4 检测器）—— v5 **L122**；
+#   * `headroom_warn_mib: 1024` —— `windows/W2.4_memory_baseline.md` §4.2；
+#   * `gpu_total_mib: 8187` —— `ENV_LOCK.md` §1 实测登记值（`windows/W2.4_memory_baseline.md` §7：
+#     判定基准取 **8187**，**不得**填厂商标称 8192 或 8×1024。注：`nvidia-smi` 自身报 8188 MiB，
+#     差 1 MiB 属驱动取整，见 `reports/env/determinism_v1.0_*.md` §9.2 第 5 项）。
+#   * `steps: 10` —— 探针上限，`windows/W2.3_determinism.md` §4.8（**禁止**跑完整 epoch）。
+
+schema: codeobf-pi/memory-probe/v1
+generated_by: W2.4
+generated_at: 2026-09-30 12:05:00
+gpu_total_mib: 8187
+
+# 主档（9 个；`01_00 --suite all` 与 `--suite <族名>` 覆盖的正是这一组）
+suites:
+  - name: idle
+    kind: baseline            # 不加载模型，仅 import torch 后采集（torch 侧计数基线）
+  - name: load-1b
+    kind: load
+    model_key: llamaguard3-1b
+    load: 4bit-nf4
+  - name: infer-1b-512
+    kind: infer
+    model_key: llamaguard3-1b
+    load: 4bit-nf4
+    batch: 1
+    seq_len: 512
+  - name: load-8b
+    kind: load
+    model_key: llamaguard3-8b
+    load: 4bit-nf4
+  - name: infer-8b-256
+    kind: infer
+    model_key: llamaguard3-8b
+    load: 4bit-nf4
+    batch: 1
+    seq_len: 256
+  - name: infer-8b-512
+    kind: infer
+    model_key: llamaguard3-8b
+    load: 4bit-nf4
+    batch: 1
+    seq_len: 512
+  - name: train-1b-10step-b1
+    kind: train
+    model_key: llamaguard3-1b
+    load: 4bit-nf4
+    batch: 1
+    grad_accum: 4
+    seq_len: 512
+    steps: 10
+    lora: {r: 16, alpha: 32, target_modules: [q_proj, v_proj]}
+  - name: train-1b-10step-b4
+    kind: train
+    model_key: llamaguard3-1b
+    load: 4bit-nf4
+    batch: 4              # v5 L434 正式训练配置；本机 8GB 可能 OOM —— 探针的目的即判定此点
+    grad_accum: 4
+    seq_len: 512
+    steps: 10
+    lora: {r: 16, alpha: 32, target_modules: [q_proj, v_proj]}
+  - name: unplug-cpu
+    kind: infer
+    model_key: unplug-tiny
+    load: cpu-fp32        # v5 L122：CPU 推理
+    batch: 1
+    seq_len: 512
+
+# 回退档（**仅当对应主档 OOM 时测**；测了才写入记录。对应关系见各档末行注释）
+fallback_suites:
+  - name: infer-8b-256-offload      # ← 对应主档 infer-8b-256（v5 回退阶梯：batch 1 → seq 256 → CPU offload）
+    kind: infer
+    model_key: llamaguard3-8b
+    load: 4bit-nf4-offload-cpu
+    batch: 1
+    seq_len: 256
+  - name: train-1b-10step-b1-offload  # ← 对应主档 train-1b-10step-b1（若 b1 亦 OOM 则测；亦作 b4→b1→offload 阶梯的末级）
+    kind: train
+    model_key: llamaguard3-1b
+    load: 4bit-nf4-offload-cpu
+    batch: 1
+    grad_accum: 4
+    seq_len: 512
+    steps: 10
+    lora: {r: 16, alpha: 32, target_modules: [q_proj, v_proj]}
+
+thresholds:
+  headroom_warn_mib: 1024     # 峰值距 gpu_total_mib 余量低于此值 ⇒ 判定「触顶风险」，须给回退档建议

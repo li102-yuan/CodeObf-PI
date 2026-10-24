@@ -1,0 +1,7 @@
+regime,n,level,train_ngrams,test_ngrams,overlap,overlap_rate,threshold,passed
+regime_id,3,char,163572,67454,57471,0.852003,0.05,n/a
+regime_id,3,word,1508076,225684,29730,0.131733,,
+regime_id,4,char,640001,200187,150027,0.749434,,
+regime_ood,3,char,102286,55084,39026,0.708482,0.05,n/a
+regime_ood,3,word,848552,146692,10757,0.073331,,
+regime_ood,4,char,368199,155583,93919,0.603658,,

@@ -1,0 +1,14 @@
+regime,run_seed,tau_tier,fp,n,fpr
+id,42,fixed050,0,64,0.0000
+id,42,star,0,64,0.0000
+id,123,fixed050,0,64,0.0000
+id,123,star,0,64,0.0000
+id,456,fixed050,0,64,0.0000
+id,456,star,0,64,0.0000
+ood,42,fixed050,0,64,0.0000
+ood,42,star,0,64,0.0000
+ood,123,fixed050,0,64,0.0000
+ood,123,star,0,64,0.0000
+ood,456,fixed050,0,64,0.0000
+ood,456,star,0,64,0.0000
+B6 (external baseline single run),n/a (no regime axis),judgment argmax(logits),0,64,0.0000

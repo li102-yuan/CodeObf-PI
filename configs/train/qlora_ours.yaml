@@ -1,0 +1,546 @@
+# configs/train/qlora_ours.yaml — W5.1 Ours（QLoRA 微调 Llama-Guard-3-1B）超参与网格空间载体
+#
+# 冻结依据：`windows/W5.1_qlora.md` §2（接口契约）／§3（阶段4 统一硬约束 C1–C11）。
+# 本文件是 Ours 微调的**唯一配置载体**：权重与加载、输入与 chat 模板、生成式二分类目标串、
+# QLoRA 超参、**事前定值**的网格空间、早停、τ_Ours 寻优、checkpoint 命名、确定性门禁。
+#
+# 硬约束（`windows/W5.1_qlora.md` §3）：
+#   C1 输入面：只读 4 个文件 regime_{id,ood}/{train,val}.csv；禁读 sealed_test 与 frozen 侧 test.csv。
+#   C2 预处理：复用 `scripts/baseline/03_06_unify_preprocess.py` 的 `load_samples()`（原文直通零清洗）
+#             与 `truncate_left`（512 token／左截断）；唯一输入列 = `text`，标签 = `label`。
+#   C3 训练目标：官方 chat 模板（`content_format: list_of_text_blocks`，空会话段即抛错）；
+#             生成式二分类，目标串 ∈ {`unsafe`, `safe`}；`score = p_unsafe/(p_unsafe+p_safe)`。
+#   C4 τ_Ours：在该体制 **val** 分片上按 F1 最大寻优，并列取 τ 较大者；禁用测试分片。
+#   C5 早停：监控该体制 val 的 F1，patience = 2，保存验证集最优 checkpoint。
+#   C6 QLoRA：4-bit NF4；LoRA 目标 q_proj/v_proj；默认 r=16／alpha=32／batch 4／grad_accum 4／
+#             lr 2e-4／epochs 3–5／max_length 512；网格 = lr{1e-4,2e-4,4e-4} × r{8,16,32}（9 组），
+#             **只在 regime_id 的 val 上做一次**，选定后固定给两体制 × 3 seeds。
+#   C7 课程与增强：见 `windows/W5.2_curriculum.md`；本文件只提供开关与契约。
+#   C8 checkpoint：`checkpoints/ours/<stage>_<seq>_<model>_<regime>_<seed>_<YYYYMMDD-HHMMSS>/seed_<seed>/checkpoint-<step>/`。
+#   C9 评估态与随机性：eval + no_grad；`CUBLAS_WORKSPACE_CONFIG=:4096:8` 先于 `import torch`；
+#             cudnn.deterministic=True／benchmark=False／allow_tf32=False；`attn_implementation: eager`。
+#   C10 显存：从 batch 4 起跑；OOM 按 `PROJECT_CONTRACT.md` §4 回退（256 token／batch 1／CPU offload／子集）并逐项登记台账。
+#   C11 报告路径：所有训练脚本必须提供 `--report-dir`，禁止把 `reports/` 任一路径写死。
+#
+# 读取约定：脚本在函数体内惰性 `import yaml`／`import torch`，保证 `make check` 探针轻量
+# （顶层不 import 重型库；`AGENTS.md` §3／`windows/W4.6_unify.md` §0.2-7）。
+
+version: "1.0"
+detector: ours
+detector_name: "Ours = QLoRA 微调 Llama-Guard-3-1B（生成式二分类）"
+frozen_by: "windows/W5.1_qlora.md §2／§3"
+declared_at: "2026-10-04"
+role: ours_qlora_finetune
+stage: "04"
+seq: "01"
+
+# ---------------------------------------------------------------------------
+# C1 输入面（**唯一授权的 4 个文件**）
+# ---------------------------------------------------------------------------
+data:
+  root: "data/frozen/CodeObf-PI_v1.0/splits"
+  train: "{root}/{regime}/train.csv"
+  val: "{root}/{regime}/val.csv"
+  allowed_abs_substrings:            # 越界即非零退出（泄露断言）
+    - "splits/regime_id/train.csv"
+    - "splits/regime_id/val.csv"
+    - "splits/regime_ood/train.csv"
+    - "splits/regime_ood/val.csv"
+  forbidden_substrings:              # A5 红线
+    - "data/sealed_test"
+    - "splits/regime_id/test.csv"
+    - "splits/regime_ood/test.csv"
+  column_text: text                  # `DATA_CARD` §3：阶段3–5 的唯一输入字段
+  column_label: label
+  val_may_not_enter_training: true   # C1／§4-2：val 只用于监控／早停／τ
+
+# ---------------------------------------------------------------------------
+# C2 预处理：唯一出处 = `03_06`（禁止本窗口自行实现读取／清洗／截断）
+# ---------------------------------------------------------------------------
+preprocess:
+  module: "scripts/baseline/03_06_unify_preprocess.py"
+  loader: load_samples               # 原文直通零清洗
+  truncation: truncate_left
+  max_seq_tokens: 512                # §1.3／门禁 4／B3／B5 同口径
+  truncation_side: left              # 保尾部 512 token
+  truncation_applied_to: sample_text # 512 上限施加于样本 `text` 本体（非拼接后 prompt）
+  sha256_from: sha256_of             # 跨阶段一致性锚点（与 B1–B5 同源）
+
+# ---------------------------------------------------------------------------
+# 权重与加载（provenance 三方：`ENV_LOCK.md` §5／§6）
+# ---------------------------------------------------------------------------
+weights:
+  key: llamaguard3-1b
+  repo_id: "meta-llama/Llama-Guard-3-1B"
+  hf_revision: "acf7aafa60f0410f8f42b1fa35e077d705892029"
+  source_channel: modelscope
+  source_repo_id: "LLM-Research/Llama-Guard-3-1B"
+  local_path: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B"
+  local_files_only: true             # 禁止触网
+  finetuned: true                    # Ours = 微调后的 LG-1B（B3 是原始权重，两者不相混）
+
+load:
+  mode: 4bit-nf4
+  device: cuda
+  device_map: {"": 0}
+  attn_implementation: eager         # **全阶段约定，禁 flash attention**（`ENV_LOCK.md` §0.4／§6）
+  dtype: bfloat16
+  quantization:
+    load_in_4bit: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_compute_dtype: bfloat16
+  forbidden_attn: ["flash_attention_2", "sdpa"]
+  eval_mode: true                    # 验证/推理一律 model.eval()（G-EVAL；`AGENTS.md` §6-11）
+  no_grad_at_eval: true              # 验证/推理一律 torch.no_grad()
+  use_cache_at_eval: false
+
+# ---------------------------------------------------------------------------
+# C3 输入构造与训练目标：**官方 chat 模板** + 生成式二分类
+# ---------------------------------------------------------------------------
+prompt:
+  template_source: official_chat_template
+  apply_chat_template: true
+  add_generation_prompt: true
+  role: user
+  content_format: list_of_text_blocks   # 官方模板按 content block 列表渲染（W4.3 空会话教训）
+  empty_conversation_guard: true        # 渲染后会话段为空即抛错
+  project_side_prompt_engineering: false
+  add_special_tokens_tokenize: false    # 模板已含 <|begin_of_text|>
+
+target:
+  kind: generative_binary              # 生成式二分类（与 B3 首行首词判词同构）
+  unsafe: "unsafe"
+  safe: "safe"
+  # 首生成位候选 token（由 tokenizer 实测解析，运行时断言一致；见 04_01 `_resolve_target_ids`）
+  unsafe_first_token_id: 39257
+  safe_first_token_id: 19193
+  first_token_ids_resolved_from: "Llama-Guard-3-1B 官方 tokenizer（add_special_tokens=False）"
+  append_eos: true                     # 目标串后接 eos，使生成可终止
+  loss_on: target_tokens_only          # 只对目标位算 logits 与 loss（prompt 位不参与）
+  label_to_target: {1: "unsafe", 0: "safe"}
+
+score:
+  definition: "p_unsafe / (p_unsafe + p_safe)"
+  position: first_generated_position   # 官方 chat 模板 + add_generation_prompt 之后的第一位
+  probabilities: "全词表 softmax 后取 {unsafe, safe} 两候选，再在两者间归一"
+  pred_rule: "score >= tau_ours"
+
+# ---------------------------------------------------------------------------
+# C6 QLoRA 超参（v5 L434 默认值；lr／r 由网格搜索在 regime_id val 上**一次**选定）
+# ---------------------------------------------------------------------------
+qlora:
+  target_modules: ["q_proj", "v_proj"]
+  lora_dropout: 0.0
+  bias: none
+  task_type: CAUSAL_LM
+  # —— 默认值（网格选定后由 `grid_selected` 覆盖 lr／r）——
+  r: 16
+  alpha: 32
+  lr: 2.0e-4
+  # —— 其余事前定值 ——
+  epochs: 3                            # v5 L434「epochs 3–5」取下限 3；**不得为赶工下调**
+  micro_batch_size: 4                  # C10「从 batch 4 起跑」
+  grad_accum: 4                        # 有效 batch = 4 × 4 = 16
+  max_seq_tokens: 512                  # = preprocess.max_seq_tokens（样本 text 侧上限）
+  optimizer: adamw
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  weight_decay: 0.0
+  lr_scheduler: constant               # v5／PREREG 未规定 ⇒ 取最简（常数），不引入未预注册调度
+  warmup_ratio: 0.0
+  max_grad_norm: 1.0
+  gradient_checkpointing: false
+
+# 显存护栏（C10）：eager attention 下峰值由 **n·L²（注意力矩阵）＋ n·L（MLP/残差激活）** 共同决定。
+# 系数取自本机**实测探针**（`reports/train/tmp/probe_batch_budget.py`、`probe_eval_mem.py`，非权威件）：
+#   训练态（含反向）delta_MiB ≈ n·L²/512 + 1.9·n·L
+#     n=2/L=708 → 5201（峰值 6777，0.69 s/步）   n=4/L=512 → 6301（7789，1.47 s/步）
+#     n=4/L=708 → 10390（峰值 11967 **> 8188 容量 ⇒ 溢出共享内存，13.9 s/步，20× 慢**）
+#     n=8/L=512 → 12485（14077，20.4 s/步）      n=8/L=708 → OOM
+#   eval 态（no_grad，激活逐层释放）delta_MiB ≈ 3.47e-4·n·L²
+#     n=16/L=708 → 2779（峰值 4325，4880 tok/s）  n=32/L=708 → 5558（7130，3393 tok/s）  n=64/L=708 → OOM
+#   ⇒ 训练取峰值目标 7000 MiB、eval 取 4600 MiB（均含 ≈1600 MiB 基座），**只降单批 n**，
+#     不改样本集／epoch／网格／lr／r（属 C10 回退阶梯「batch 1」的逐批应用，已登记台账）。
+batch:
+  max_size: 4                          # = qlora.micro_batch_size（C10 起跑值）
+  peak_budget_mib: 7000                # 训练态峰值目标（容量 8188，留 ≈1200 给底噪与碎片）
+  eval_max_size: 16
+  eval_peak_budget_mib: 4600           # eval 态峰值目标（no_grad，显存远低于训练）
+  mem_model:
+    base_mib: 1600                     # 4-bit 基座 + LoRA 常驻（实测 1487–1602）
+    quad_coef: 0.001953125             # = 1/512：训练态二次项系数
+    linear_coef: 1.9                   # 训练态一次项系数
+    eval_quad_coef: 0.000347           # eval 态二次项系数（无一次项）
+    eval_linear_coef: 0.0
+  length_grouped: true                 # 按长度邻近组批 ⇒ 动态填充最小
+  shuffle_batch_order: true            # 批次顺序按 seed 洗牌
+
+# OOM 回退阶梯（`PROJECT_CONTRACT.md` §4／C10）：逐项登记台账，不得静默降级
+oom_fallback:
+  ladder: ["micro_batch-1", "cpu-offload", "subset"]
+  register_each_step: true
+
+# ---------------------------------------------------------------------------
+# C6 网格搜索空间（**事前定值**；只在 regime_id 上做一次）
+# ---------------------------------------------------------------------------
+grid:
+  enabled: true
+  only_regimes: ["id"]                 # `PREREG_v1.md` §9「仅在验证集上做一次」
+  lr: [1.0e-4, 2.0e-4, 4.0e-4]
+  r: [8, 16, 32]
+  n_cells: 9                           # 3 × 3，等式校验（少一组即非零退出）
+  report:
+    metrics: ["val_f1_best", "val_f1_at_best_epoch", "wall_seconds", "peak_memory_mib",
+              "tau_ours", "n_epochs_run", "early_stopped"]
+  selection:
+    objective: val_f1_best
+    tie_break: ["lower_lr", "lower_r"] # 并列时的固定规则（事前定值，避免事后择优）
+  ood_second_search: forbidden         # OOD 侧另起一次搜索属偏离，须先写台账并呈 W0
+
+  # ---------------------------------------------------------------------------
+  # §C6-b 序贯省时路径 ＋ 事前定值停止规则（**W0 `D-42` 裁定六 批准的可选路径**）
+  #
+  # 背景：默认 9 组 ≈23–24 h（`TRAIN_CONFIG_Ours.md` §7 实测）。W0 另批一条省时路径：
+  #   先跑 **r=16 × 3 个 lr**（`lr ∈ {1e-4, 2e-4, 4e-4}`，≈7.8 h），若满足下述**事前写死**
+  #   的停止规则即可**停**并固定 `(lr*, r=16)`；否则**继续**补跑剩余 6 组（r∈{8,32} × 3 lr）。
+  #
+  # ⚠ 反事后择优（`D-42` 裁定六硬约束）：
+  #   ① 本停止规则**必须先写入本 yaml 并登记 `DEVIATION_LEDGER.md`**，之后才允许开跑；
+  #   ② 判据全部**事前定值**（阈值、方向、边界判定见下），**不得**在看到结果后再调阈值/换口径；
+  #   ③ 停止后 `grid_selected` 只允许回填**该 3 组中按 `selection.objective`／`tie_break` 选出者**，
+  #      不得因「补跑可能更好」而擅自扩搜（扩搜＝偏离，须先写台账并呈 W0）。
+  #
+  # 停止规则（**全部**满足才可停；`R = {val_f1_best of the 3 cells}`）：
+  #   条件 A（极差收敛）：max(R) − min(R) < range_threshold          # 3 组 F1 极差 < 0.0100
+  #   条件 B（最优非边界）：best_lr ∉ {lr_min, lr_max}               # 最优 lr 不得是端点（中枢在内部）
+  #   条件 C（最优非下限）：best_lr 对应的 val_f1_best ≥ min_absolute_f1（防止三组齐差仍判「收敛」）
+  #   条件 D（无平局越界）：按 tie_break 选出的 best 唯一，或平局集合**不跨**边界（避免边界并列被
+  #            规则 B 判为「非边界」）
+  # 任一不满足 ⇒ 判为「未收敛」⇒ 必须补跑剩余 6 组（回到默认 9 组口径）。
+  # 停止或续跑均须把「判定所用 R 与四条件实测值」写入 `reports/train/qlora_grid_v1.0_<ts>.md` 与台账。
+  # ---------------------------------------------------------------------------
+  sequential:
+    enabled: true                      # 允许走省时路径；**不代表一定会停**（由停止规则判）
+    stage1_r: 16
+    stage1_lrs: [1.0e-4, 2.0e-4, 4.0e-4]   # 第一阶段只跑 r=16 的 3 组
+    stage2_r: [8, 32]                  # 仅当停止规则**未满足**时补跑（补足默认 9 组）
+    stopping_rule:
+      # 事前定值阈值（**写死**；`<` 严格小于，等于不算收敛）
+      range_threshold: 0.0100          # 条件 A：3 组 val_f1_best 极差须 < 0.0100
+      best_lr_must_be_interior: true   # 条件 B：最优 lr 须为内部值（非 lr_min/lr_max）
+      boundary_lrs: [1.0e-4, 4.0e-4]   # 条件 B：边界值集合（命中即判边界）
+      min_absolute_f1: 0.5000          # 条件 C：最优 val_f1_best 须 ≥ 该下限
+      tie_rule: "unique_or_non_boundary"  # 条件 D：best 唯一，或平局集合不跨边界
+      # 判定方向：ALL 条件同时满足 ⇒ stop；否则 continue（不得部分采用）
+      logic: "ALL"
+      on_stop: "fix_stage1_best"       # 停 ⇒ 固定 (best_lr, r=16)
+      on_continue: "run_remaining_stage2"  # 续 ⇒ 补跑 r∈{8,32}×3 lr（回到 9 组）
+    fixed_pair_if_stop:                # 停止时固定值（**由实测回填**，此处仅为占位默认）
+      lr: null
+      r: 16
+    registered_before_run: true        # 本块须先登记台账（`D-42` 裁定六）后开跑
+    ledger_ref: "DEVIATION_LEDGER.md#D-42-裁定六-序贯网格停止规则（事前定值）"
+
+# 网格选定值回填节
+# **`2026-10-04` 变更（W0 `D-43` 裁定一／二；`D-45` §四①）**：原注「由 `--mode grid` 回填；
+# 未跑完前恒为 `PENDING_W0`，**禁止手工填**」已被取代 —— 网格因 **`val` 饱和**
+# （`cell 1` 第 1 个 epoch 即 `val_f1 = 1.000000`／TPR 1.0／FPR 0.0 ⇒ 判据退化为常量）
+# 由 **W0 主动中止**（`D-43` 裁定一，`22:57` 执行 `taskkill //F //PID 24340`），
+# 故 **不再由搜索回填**；超参改取 **v5 L434 预注册默认值**（`D-43` 裁定二）。
+# 属**重大偏离**（`PREREG_v1.md` §9 的网格搜索未完成）⇒ 已在 `DEVIATION_LEDGER.md` 登记，
+# 并须在最终报告与论文 Limitation 中如实声明。
+grid_selected:
+  status: "SELECTED"                   # PENDING_W0 | SELECTED
+  lr: 2.0e-4
+  r: 16
+  regime: "id"
+  selected_at: "2026-10-04T23:44:52"
+  source: "v5_L434_default"            # **非**由网格搜索选出（`D-43` 裁定二）
+  grid_status: "ABORTED_SATURATED"     # 网格 1/9 组（且仅 1/3 epoch）后被 W0 中止
+  selected_rationale: "唯一既不依赖已退化判据、又不在搜索空间边界（1e-4／4e-4）的值 ⇒ 不引入事后选择偏差"
+  source_report: "reports/train/qlora_grid_aborted_v1.0_20261005-001350.md"   # `D-46` 裁定五：指向中止报告，不得 null
+
+# ---------------------------------------------------------------------------
+# C5 早停（PREREG_v1.md §5／v5 L759）
+# ---------------------------------------------------------------------------
+early_stopping:
+  monitor: val_f1                      # 该体制 val 的 F1
+  mode: max
+  patience: 2                          # 连续 2 轮不上升即停
+  min_delta: 0.0
+  save_best: true                      # 保存验证集最优 checkpoint
+  may_not_reference_test: true         # 早停计数与 best 选择不得引用任何测试集量
+
+# ---------------------------------------------------------------------------
+# C4 τ_Ours 寻优（与 τ_B2 同制；`03_07` 单源口径）
+# ---------------------------------------------------------------------------
+threshold:
+  name: tau_ours
+  search_on: "{regime}_val"
+  objective: f1_max
+  tie_break: larger_tau                # 并列取 τ 较大者
+  candidates: unique_scores_plus_inf   # 全部唯一 score（含 ±∞ 端点）
+  pred_rule: "score >= tau"
+  forbid_test_split: true
+  curve_csv: "threshold_search_ours_{regime}_{ts}.csv"
+
+  # -------------------------------------------------------------------------
+  # τ 主口径**触发式**改用 `0.5`（`D-47` 裁定二；**属口径变更**）
+  #
+  # 规则（**事前写定，非事后择优**）：
+  #   若 τ* 为**边界解** **且** 「负类 `score max` 与 τ* 之差 **< 1e-3**」
+  #   ⇒ **主口径改用对照 `τ = 0.5`**，τ* **降级为并列报告**。
+  # 影响面（**`D-53` 裁定三 更正：改为「触发时 `0.5`、未触发时 `τ*`」，原为无条件表述**）：
+  #   `W6`（A6）在 test 上 **触发时以 `0.5` 为主口径、未触发时以 `τ*` 为主口径**，
+  #   并**并列报另一者**；**逐 run 独立判定**（每 run 有各自的 `τ*` 与 `gap`，不得一次性统一）；
+  #   τ 一律取**全精度**（`meta.json`／内存变量，`F-W5.1-2`）。
+  #   ⚠ **实测（`D-53` 裁定三）**：`W5.3` 首跑 **未触发**（边界解 True 但 `gap = 0.9626216776669025 ≫ 1e-3`）
+  #   ⇒ **主口径 = `τ* = 0.9999485611915588`（全精度）**。
+  #   论文须声明该口径变更与「逐 run 判定」。**未触发时行为与原口径完全一致。**
+  # 依据的三条理由见台账「`D-47` 裁定二 执行条」（其中理由①已由 `W5.1` 更正，
+  # 见同条：原述「两次运行间翻转 10/792 样本」实为 6 位显示值 `_fmt(τ,6)` 所致）。
+  # -------------------------------------------------------------------------
+  main_criterion_override:
+    enabled: true
+    authority: "`D-47` 裁定二（2026-10-05）"
+    logic: "AND"                          # 两个触发条件须**同时**成立
+    trigger:
+      tau_is_boundary_solution: true      # 条件一：τ* 为边界解（见 boundary_definition）
+      neg_max_gap_below: 1.0e-3           # 条件二：负类 score max 与 τ* 之差 < 该值
+    boundary_definition:                  # τ*「边界解」判定（`D-43` 裁定三 字面）
+      tau_gt: 0.99
+      tau_lt: 0.01
+      or_candidate_extreme: true          # 或 τ* == min(uniq) / == max(uniq)
+    on_trigger:
+      main_tau: 0.5                       # **定值**（`D-46` 裁定三 已定死，禁二选一）
+      tau_star_report: "parallel"         # τ* 降级为并列报告（不得省略）
+
+# ---------------------------------------------------------------------------
+# C8 checkpoint 命名（`AGENTS.md` §4.5）
+# ---------------------------------------------------------------------------
+checkpoint:
+  root: "checkpoints/ours"
+  run_id_format: "{stage}_{seq}_{model}_{regime}_seed{seed}_{ts}"
+  # 例：`04_01_llamaguard1b_id_seed42_20261004-120000/seed_42/checkpoint-500`
+  run_id_example: "04_01_llamaguard1b_id_seed42_20261004-120000"
+  seed_dir_format: "seed_{seed}"
+  step_dir_format: "checkpoint-{step}"
+  model_key: llamaguard1b
+  forbid_overwrite_same_name: true
+  best_pointer_file: "best.json"       # 供 W5.4（`04_04`）按指针取 6 个 checkpoint
+  save_tokenizer: true
+
+# ---------------------------------------------------------------------------
+# `D-48` 可续跑：**step 级精确续跑**（`D-48` 裁定一／三；**属口径变更**，事前定值）
+#
+# 背景：单次全量 ≈3.3–8.75 h 且**不可续跑** ⇒ 任何中断都从零重跑（`D-44` 裁定三）。
+# `D-48` 裁定一 批准 (b)，**形式限定为「step 级精确续跑」**，**禁止**「只在 epoch 末落盘、
+# 中断则回退整轮」的粗粒度方案（实测 1 epoch = 1,184 opt_steps = 65–175 min ⇒ 属**假改造**）。
+# **未传 `--resume` 时，行为须与改造前逐字节一致。**
+# ---------------------------------------------------------------------------
+resume:
+  enabled: true
+  authority: "`D-48` 裁定一／三（2026-10-05）"
+  state_dir_name: "state"               # 与 `checkpoint-{step}` 语义**分离**（禁复用 `save_checkpoint`）
+  state_every_opt_steps: 100            # 落盘粒度：每 100 个 optimizer step
+  save_only_after_opt_step: true        # 只在 `opt.step()` 之后
+  save_only_when_pending_zero: true     # 且 `pending == 0`（**不存梯度**）
+  rolling: ["latest", "prev"]           # 滚动双份
+  atomic_write: "tmp + os.replace"      # 原子写
+  include_tokenizer: false              # 续跑 state **不写** tokenizer（裁定三）
+  cli: "--resume <state_dir>"
+  proof_hook_cli: "--stop-after-steps N"  # **仅供 `D-48` 裁定四 等价性自证**；默认 None ⇒ 无影响
+  forbid: "只在 epoch 末落盘／中断回退整轮（**假改造**，裁定一）"
+  state_items:                          # `D-48` 裁定二（**缺一即判不等价**）
+    - "model 可训练参数（LoRA adapter）"
+    - "opt.state_dict()（AdamW exp_avg／exp_avg_sq／step）"
+    - "rng 的 random.Random.getstate()"
+    - "torch／cuda RNG state（保险项；lora_dropout=0 下预期无影响）"
+    - "epoch／opt_steps／global_micro／pending（落盘点恒为 0）"
+    - "**当前 epoch 的 micro_batches 排列 ＋ 已消费游标**（关键项）"
+    - "stopper.best／stopper.counter（patience=2）"
+    - "best 指针与 best_state"
+    - "curve_rows（含 val_f1／tau／early_stop_counter）"
+    # 本窗口追加（裁定二清单为**下限**；不加则 epoch 均值 loss 不等价）：
+    - "epoch_loss／n_micro（并 n_curriculum_skipped）—— 为满足『等价性』所必需"
+    # `D-50` 裁定二① 追加（`D-50` 称之为「**第 10 项**」；理由 = **产物目录连续性**，与上一项同型如实追加）。
+    # 计数说明（免歧义）：本节共 **11 条** = `D-48` 裁定二 原 9 条 ＋ 本窗口追加 2 条
+    # （`epoch_loss`／`n_micro` 与 `ts`／`run_id`）；`D-50` 的「第 10 项」编号未把前一条追加单列。
+    - "**ts／run_id** —— `--resume` 时以 state 的 `ts` 覆盖本进程新生成的 `ts`，使 `save_checkpoint`／`write_best_pointer`／`write_curve`／`write_threshold_curve` 全部沿用该 ts ⇒ 续跑落回**同一 `run_id` 目录**（修 `N-8` 产物目录分裂）"
+  disclosure:                            # `D-48` 裁定六：披露义务
+    meta_json_key: "segments"            # n_segments／每段 start_step,end_step,wall_seconds；`best.json` 同期增记
+    paper_note: "训练可分 k 段续跑，已通过等价性自证（三量 Δ=0）；**不得**写成「单次连续训练」"
+    gpu_total: "总 GPU 时长**不变**（≈20–52.5 h）—— (b) 只消除『不可中断』"
+  equivalence_proof:                     # `D-48` 裁定四（**`W5.3` 放行前置**）
+    scale: "smoke：正32／负32 × 1 epoch（与 `N-5` 同规模；**不得**用全量）"
+    method: "同一 seed：**一次跑完** vs **分 2 段续跑**（切点须记入报告）"
+    compare: ["loss", "val_f1", "tau"]
+    tolerance: {loss_abs: 0.0, val_f1_abs: 0.0, tau_abs: 0.0}
+    fail_action: "立即呈 W0；`W5.3` **不得开跑**；**不得**『带差异放行』"
+  channels:                              # `D-48` 裁定五
+    default: ["a_terminal", "b_resume"]  # (a) 本机终端 ＋ (b) 可续跑
+    optional_c: "harness 分段托管：段 ≤3 h、段末须确认 state 落盘、三判据跨 ≥3 时点"
+
+# ---------------------------------------------------------------------------
+# `D-54` 裁定三：`04_01` **loss-NaN 守卫**（**工程性改进，非口径变更**；**默认启用**）
+#
+# 背景：`ood:42` 自 `EPOCH 2` 起 `loss=nan` 却**静默跑完**（跨 epoch 续跑至 1500 步、
+# 白烧 8.21 h），且其 `--resume` 的 state 被**全 NaN 权重**污染 ⇒ 照做会静默载入坏权重。
+# 本条 = 事前定值（6 条见下）；实现见 `04_01.nan_guard_violated()` 与训练循环内检测点。
+# ---------------------------------------------------------------------------
+nan_guard:
+  enabled: true                         # 默认启用
+  cli_off_switch: "--no-nan-guard"      # 传之 ⇒ 行为与改造前**逐字节不变**（供等价性自证）
+  detect_point: "每个 micro-batch 的标量 `loss`（训练循环内 `epoch_loss += <lv> * accum` 之后）"
+  pred: "not math.isfinite(loss)"
+  forbid: ["只在 epoch 末检查"]          # 本 run 的 NaN 自 EPOCH 2 **首步**即出现 ⇒ epoch 末检查会白烧整轮
+  on_trigger:                            # **四不一停**
+    log: "NAN_GUARD_TRIGGERED step=<opt_steps> epoch=<e> loss=<repr>"
+    save_state: false                    # 不落盘 state —— 当前 state 已含 NaN，落盘会覆盖干净快照
+    overwrite_best: false                # 不覆盖 `best`
+    delete_any_file: false               # 不删任何文件
+    auto_recover: false                  # 不自动恢复（不改 `lr`／不回滚／不换 ckpt）
+    exit_code: 3                         # 与正常 `0` 区分 ⇒ **停工呈 W0**
+  equivalence_proof:                     # `D-48` 裁定四 同型
+    scale: "smoke：正32／负32 × 1 epoch"
+    method: "**有守卫** vs **`--no-nan-guard`**"
+    compare: ["loss", "val_f1", "tau"]
+    tolerance: {loss_abs: 0.0, val_f1_abs: 0.0, tau_abs: 0.0, md5: "equal"}
+  red_lines: ["不改 `epochs`／`lr`／`r`／样本集／阈值／`patience`／课程／增强"]
+
+# ---------------------------------------------------------------------------
+# C9 确定性门禁（`ENV_LOCK.md` §7.2 同制）
+# ---------------------------------------------------------------------------
+determinism:
+  set_before_import_torch:
+    CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+  cudnn_deterministic: true
+  cudnn_benchmark: false
+  allow_tf32: false
+  seeds: [42, 123, 456]
+  explicit_rng: true                   # 用 `random.Random(seed)`，不用全局 RNG
+  attn_implementation: eager
+
+  # -------------------------------------------------------------------------
+  # N-5 修复开关（`D-42` §4 处置①②；**事前定值，先于任何训练跑写入**）
+  # -------------------------------------------------------------------------
+  # 由 `04_01.set_determinism()` 在 import torch 之后立即施加。`cudnn.deterministic`
+  # 只覆盖 cuDNN，**不覆盖** embedding backward／`index_select`／scatter-add 等
+  # （LoRA 微调正涉及这些）⇒ 必须开启框架级确定性算法。
+  use_deterministic_algorithms: true
+  # `True` = 只告警不抛错（某算子无确定性实现时不中断训练，但须在日志中留痕）；
+  # `False` = 严格模式（无确定性实现即抛 `RuntimeError`）。
+  # 事前抉择：以 `False` 启动，要求**任一非确定算子立即暴露**——宁可跑失败也不静默带噪；
+  # 若 4-bit NF4 路径在严格模式下确有算子无确定实现，则据实降为 `True` 并在台账登记。
+  deterministic_warn_only: false
+
+  # -------------------------------------------------------------------------
+  # N-5 自证判据（**事前定值**：修复后同一代码连跑两次冒烟的容差）
+  # -------------------------------------------------------------------------
+  # 判据来源 = `D-42` §4 处置②「`loss`／`val_f1`／`tau` 三项须一致（容差判据须事前定值）」。
+  # 位级一致（差值 == 0）为「达标」；下述容差为「可接受上限」，**超出即判未达标**。
+  verify_double_run:
+    n_runs: 2                          # 连跑次数
+    regime: id                         # 自证体制
+    seed: 42                           # 自证种子（与 N-5 复现所用一致）
+    tolerance:
+      loss_abs: 0.0                    # `loss` 需**位级一致**（差值 ≤ 0.0）
+      val_f1_abs: 0.0                  # `val_f1` 需**位级一致**
+      tau_abs: 0.0                     # `tau_Ours` 需**位级一致**
+    # 位级不可达时的降级路径（`D-42` §4 处置③）：如实测噪声基线并呈 W0 另裁，
+    # **不得**宣称 3 seeds 方差有意义。降级判据亦事前定值：
+    degrade_if_loss_abs_gt: 1.0e-6     # 若 `loss` 差值 > 1e-6 ⇒ 判「位级不可达」
+    noise_baseline:                    # 降级时改为「同 seed 双跑实测噪声」口径
+      report_deltas: ["loss", "val_f1", "val_tpr", "val_fpr", "tau"]
+
+  # -------------------------------------------------------------------------
+  # N-5 自证判据 **v2**（`D-46` 裁定四；**更正 `D-43` 裁定六的过度之处**）
+  #
+  # 沿革（如实留档）：
+  #   `verify_double_run`（v1 原判据）→ `D-43` 裁定六 以「`val_f1` 在全量下饱和」为由
+  #   一度要求改为**仅非饱和量**（本窗口当日实现为 `verify_double_run_non_saturated`，
+  #   并据此跑过 `--epochs 3` 的一对）→ **`D-46` 裁定四 更正**：该顾虑**只对全量成立**；
+  #   **smoke 规模下实测 `val_f1 = 0.86614173`，并不饱和** ⇒ **判据维持
+  #   `loss`／`val_f1`／`tau` 三量**（与 `5c502d0` 的自证同口径即可）。
+  #
+  # **规模（事前定值，`D-46` 裁定四①）**：smoke 规模 正32／负32 × **1 epoch**（**不得**用全量）。
+  # **降级条款（事前写入，先于取证，`D-46` 裁定四③）**：**仅当** smoke 规模下 `val_f1`
+  #   **亦出现 `= 1.0`** 时，**才**降级改用「逐 step `loss` 序列 ＋ `tau`」；
+  #   否则一律用 `loss`／`val_f1`／`tau`。
+  # -------------------------------------------------------------------------
+  verify_double_run_v2:
+    declared_at: "2026-10-04"
+    authority: "`D-46` 裁定四（更正 `D-43` 裁定六）"
+    supersedes: ["verify_double_run", "verify_double_run_non_saturated"]
+    scale: "smoke：正 32／负 32 × **1 epoch**（`04_00_smoke_train.py` 默认规模）"
+    vehicle: "scripts/train/04_00_smoke_train.py"
+    n_runs: 2
+    regime: id
+    seed: 42
+    epochs: 1
+    compare:                              # ← `D-46` 裁定四②：维持三量
+      - "`loss`（曲线 CSV 的 `train_loss`）"
+      - "`val_f1`"
+      - "`tau_ours`"
+      - "checkpoint `adapter_model.safetensors` 的 md5（附加佐证）"
+    tolerance:
+      loss_abs: 0.0                       # 位级一致
+      val_f1_abs: 0.0                     # 位级一致
+      tau_abs: 0.0                        # 位级一致
+      md5: "equal"
+    downgrade_clause:                     # **事前写入**（`D-46` 裁定四③）
+      trigger: "smoke 规模下 `val_f1` 亦出现 `= 1.0`"
+      then_compare: ["逐 step `loss` 序列", "`tau`"]
+      before_trigger: "一律用 `loss`／`val_f1`／`tau`"
+
+# ---------------------------------------------------------------------------
+# C7 课程学习开关（**只留开关与 import 契约**；逻辑归 `04_02`／W5.2）
+# ---------------------------------------------------------------------------
+curriculum:
+  module: "scripts/train/04_02_train_curriculum.py"
+  entry_class: CurriculumScheduler
+  # W5.2：课程计划本体在 `configs/train/curriculum.yaml`（事前定值，唯一声明处）。
+  # `04_02.resolve_plan_cfg()` 认 `curriculum.config_path` 这一形态；**缺此项则 `--curriculum on`
+  # 静默降级为 off**（W5.2 实跑已观测到 `CURRICULUM_SKIP: 构造失败`），故此项为接线必需。
+  config_path: "configs/train/curriculum.yaml"
+  default: "off"                       # `--curriculum on` 时才 import
+  graceful_skip_when_missing: true     # `04_02` 未实现时打印一行告警并以 off 继续，**不得抛 NotImplementedError**
+  applies_to: train_split_only
+
+# ---------------------------------------------------------------------------
+# C11 输出路径（**唯一声明处**；脚本一律以 `--report-dir`／`--out-dir` 覆盖，禁止写死）
+# ---------------------------------------------------------------------------
+paths:
+  default_report_dir: "reports/train"
+  default_out_dir: "checkpoints/ours"
+  default_log_dir: "logs/train"
+  smoke_subdir: "tmp"                  # 冒烟产物落 `reports/train/tmp/`（**不入权威目录**）
+  artifacts:
+    log: "04_01_train_qlora_ours_{ts}.log"
+    curve: "curve_{regime}_{seed}_v1.0_{ts}.csv"
+    threshold: "threshold_search_ours_{regime}_{ts}.csv"
+    grid_md: "qlora_grid_v1.0_{ts}.md"
+    grid_csv: "qlora_grid_v1.0_{ts}.csv"
+
+# ---------------------------------------------------------------------------
+# 泄漏与一致性断言（C1／§4-1／§4-2／§6-3）
+# ---------------------------------------------------------------------------
+assertions:
+  only_four_split_files: true
+  no_sealed_test_access: true
+  val_not_in_train: true
+  text_sha256_source: "03_06.sha256_of"   # 与 B1–B5 同源
+  ood_train_encodings: ["base64", "rot13", "zerowidth", "url", "reverse"]   # 体制二恒 5 训练码
+  ood_heldout_encodings: ["hex", "morse", "ascii_art", "homoglyph"]         # 4 留出码命中须 = 0
+  fail_exit_code_nonzero: true
+
+# ---------------------------------------------------------------------------
+# 接口契约（`windows/W5.1_qlora.md` §2，冻结 v1.0）
+# ---------------------------------------------------------------------------
+interface:
+  cli: "python scripts/train/04_01_train_qlora_ours.py --regime {id,ood} --seed {42,123,456} --config <yaml> [--mode {train,grid,threshold}] [--curriculum on|off] [--epochs N] [--max-steps N] [--report-dir DIR] [--out-dir DIR] [--checkpoint-dir DIR]"
+  stdout_last_line_train: "CHECKPOINT_DIR=<abs path>"
+  stdout_last_line_grid_or_threshold: "RESULT_CSV=<path>"
+  exit_code_ok: 0
+  exit_code_assert_fail_nonzero: true

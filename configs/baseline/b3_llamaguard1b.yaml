@@ -1,0 +1,183 @@
+# configs/baseline/b3_llamaguard1b.yaml — W4.3 B3（Llama-Guard-3-1B **原始推理**）加载与推理参数载体
+#
+# 冻结依据：`windows/W4.3_b3_lg1b.md` §0.3（W4 冻结）；接口 `windows/W4.6_unify.md` §1.3／§2／§3。
+# 本文件是 B3 **加载与推理参数的唯一配置载体**：权重路径与 rev、`4bit-nf4`／cuda／`eager`、
+# 512 token 左截断、官方 chat 模板、判词首行首词映射、生成参数、显存与延迟记录项。
+#
+# 硬约束（`windows/W4.3_b3_lg1b.md` §0.4）：
+#   1. **不微调、不改权重、不换 checkpoint**（B3 = 原始 LG-1B；微调后的 LG-1B 是 Ours，归 W5）；
+#   2. 只读 `text` 列；`text_sha256` 一致性；
+#   3. 读 `sealed_test` 前登记 ACCESS_LOG（6 列），读后复核 md5；
+#   4. 无阈值（判词二值）；`score` 留空；AUROC 记 `n/a`；
+#   5. `clean_test` 是 B3 的**强项预期**（明文恶意对原始 LG-1B 可见）——如实报告；
+#   6. 冒烟阶段抽 1 条样本双跑比对判词逐字一致；
+#   7. 显存记录：加载态与推理态峰值（`max_memory_allocated`）。
+#
+# 读取约定：脚本在函数体内惰性 `import yaml`／`import torch`，保证 `make check` 探针轻量
+# （顶层不 import 重型库，`AGENTS.md` §3／`windows/W4.6_unify.md` §0.2-7）。
+
+version: "1.0"
+detector: b3
+detector_name: "Llama-Guard-3-1B（原始推理，不微调）"
+frozen_by: "windows/W4.3_b3_lg1b.md §0.3"
+declared_at: "2026-10-03"
+role: baseline_b3_raw_inference
+
+# ---------------------------------------------------------------------------
+# §0.3 权重（provenance 三方：`ENV_LOCK.md` §5／§6）
+# ---------------------------------------------------------------------------
+weights:
+  key: llamaguard3-1b                 # `ENV_LOCK.md` §5／§6 的登记键
+  repo_id: "meta-llama/Llama-Guard-3-1B"
+  hf_revision: "acf7aafa60f0410f8f42b1fa35e077d705892029"
+  source_channel: modelscope          # 魔搭 `LLM-Research/Llama-Guard-3-1B`（`D-07`）
+  source_repo_id: "LLM-Research/Llama-Guard-3-1B"
+  local_path: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B"
+  provenance_file: "models/hf_cache/modelscope--LLM-Research--Llama-Guard-3-1B/PROVENANCE.json"
+  local_files_only: true              # 禁止触网
+  exclude_prefixes: ["original/"]     # `D-11`：排除 original/*（1B 侧 3.00 GB）
+  finetuned: false                    # **B3 = 原始权重**；微调版归 W5（Ours）
+
+# ---------------------------------------------------------------------------
+# §0.3 加载（`ENV_LOCK.md` §6／§6.1：`4bit-nf4`／cuda／eager）
+# ---------------------------------------------------------------------------
+load:
+  mode: 4bit-nf4                      # bitsandbytes NF4
+  device: cuda
+  device_map: {"": 0}
+  attn_implementation: eager          # **全阶段约定，禁 flash attention**（`ENV_LOCK.md` §0.4／§6）
+  dtype: bfloat16                     # 与 `ENV_LOCK.md` §7.2 的实测 dtype 一致
+  quantization:
+    load_in_4bit: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_compute_dtype: bfloat16
+  forbidden_attn: ["flash_attention_2", "sdpa"]
+  eval_mode: true                     # `model.eval()`（G-EVAL；`AGENTS.md` §6-11）
+  no_grad: true                       # `torch.no_grad()` 硬断言
+
+# ---------------------------------------------------------------------------
+# §0.3 输入：原文直通 → 官方 tokenizer → **512 token／左截断**（保尾部）
+# ---------------------------------------------------------------------------
+input:
+  column: text                        # `DATA_CARD` §3：阶段3–5 的唯一输入字段
+  pass_through: true                  # §1.2 原文直通：不清洗／不归一／不改大小写
+  max_seq_tokens: 512                 # §1.3 最大序列长度（与门禁 4 一致）
+  truncation_side: left               # 保尾部 512 token
+  truncation_applied_to: sample_text  # 见本报告 §截断口径声明
+  add_special_tokens: false           # chat 模板已含 <|begin_of_text|>；与 `03_06` 同口径
+  tokenizer_local_files_only: true
+
+# ---------------------------------------------------------------------------
+# §0.3 prompt：**Llama-Guard-3 官方 chat 模板原样使用**
+# ---------------------------------------------------------------------------
+prompt:
+  template_source: official_chat_template   # tokenizer_config.json 的 chat_template
+  apply_chat_template: true
+  add_generation_prompt: true
+  role: user
+  # **官方消息格式**（Llama-3.2 多模态消息格式；Llama-Guard-3 与 8B 视觉版同源）：
+  # 官方模板用 `message['content'] | selectattr('type','equalto','text')` 渲染会话段，
+  # 故 `content` 必须是**内容块列表** [{"type":"text","text": <text>}]；
+  # 传纯字符串会**静默渲染出空会话段**（模型只看任务前缀，判词退化为常数）。
+  content_format: list_of_text_blocks
+  template_trims_content: true        # 官方模板自带 `content['text'] | trim`（属其管线，如实披露）
+  categories: default_from_template   # S1–S13 由官方模板自带，不覆写
+  project_side_prompt_engineering: false    # **禁止**任何项目侧 prompt 工程（B3 = 原始推理基线）
+  empty_conversation_guard: true      # 渲染后会话段为空即抛错（防退化判词静默通过）
+
+# ---------------------------------------------------------------------------
+# §0.3 生成（确定性贪心；无采样）
+# ---------------------------------------------------------------------------
+generation:
+  do_sample: false                    # 贪心解码（确定性）
+  max_new_tokens: 20                  # 判词形如 `unsafe\nS1`／`safe`，20 token 足够
+  num_beams: 1
+  temperature: null                   # 不设（do_sample=false）
+  top_p: null
+  pad_token_id_from: eos_token_id
+  decode_skip_special_tokens: true
+  seed: 42                            # 与 `ENV_LOCK.md` §7.2 的确定性配置同源
+
+# ---------------------------------------------------------------------------
+# §3 判词 → 二分类映射（首行首词，冻结口径）
+# ---------------------------------------------------------------------------
+mapping:
+  kind: judgment
+  rule: first_line_first_word_equals_unsafe
+  unsafe_word: unsafe                 # 首行首词 == `unsafe` ⇒ pred = 1
+  safe_word: safe                     # 首行首词 == `safe` ⇒ pred = 0
+  unparsed_counting: true             # 首行首词 ∉ {safe, unsafe} ⇒ 记 `unparsed`，**计数披露**
+  unparsed_pred: ""                   # unparsed 的 `pred` **留空**（不默认兜底为 0/1）
+  threshold: null                     # 无阈值（判词二值）
+  parse_steps:
+    - strip_whole_judgment            # 先 strip 判词整体
+    - take_first_line                 # 再取首行
+    - strip_line_and_take_first_whitespace_token
+  freeze_note: "首行首词口径冻结；`unparsed` 高时只登记计数与样例判词原文，不得自行改解析规则"
+
+# ---------------------------------------------------------------------------
+# §2 输出 schema（与 `windows/W4.6_unify.md` §2 逐列一致）
+# ---------------------------------------------------------------------------
+output:
+  directory: reports/baseline/outputs
+  filename: "b3_<split>_v1.0_<YYYYMMDD-HHMMSS>.csv"
+  columns: [sample_id, text_sha256, pred, raw_type, raw, score, latency_ms]
+  raw_type: judgment                  # §2 raw_type.b3
+  raw_semantics: "判词原文（JSON 字符串）"
+  score: null                         # §2 score_source.b3 = **留空**
+  pred: judgment_mapped               # 规则型即时映射（首行首词）
+  auroc: "n/a"                        # §4.2：B3 无连续 score ⇒ AUROC 记 n/a
+  encoding: utf-8
+  newline: lf
+
+# ---------------------------------------------------------------------------
+# §1 评估分片（三个测试分片；B3 无 τ 寻优，故不跑验证分片）
+# ---------------------------------------------------------------------------
+splits:
+  eval: [id_test, ood_test, clean_test]
+  all: [id_test, ood_test, clean_test]
+  paths_from: "configs/baseline/unify.yaml"   # 分片路径的唯一出处（W4.6 冻结）
+  sealed: true                        # 三个分片均在 data/sealed_test/ ⇒ **每次读取前登记 ACCESS_LOG**
+
+# ---------------------------------------------------------------------------
+# §0.4-6 冒烟：抽 1 条样本双跑，判词**逐字一致**
+# ---------------------------------------------------------------------------
+smoke:
+  double_run_enabled: true
+  double_run_sample: first_of_split   # 取该分片第 1 条样本
+  compare: judgment_verbatim          # 比对判词原文（不只是 pred）
+  on_mismatch: report_and_continue    # 不一致 ⇒ 如实登记（全量 G-DET 已由 W2.3 冻结，不重做）
+  note: "确定性抽检；全量 G-DET 已由 W2.3 冻结（logits md5 `bd5ff019fe7c7900080b6a8708d1de45`）"
+
+# ---------------------------------------------------------------------------
+# §0.4-7 / §4.2 显存与延迟记录
+# ---------------------------------------------------------------------------
+measurement:
+  memory:
+    metric: max_memory_allocated      # 峰值（字节；报告同时给 MiB）
+    states: [load, infer]             # 加载态与推理态分列
+    reset_between_states: true
+  latency:
+    metric: latency_ms                # 单样本处理延迟（不含模型加载）
+    excludes: [model_load, csv_io]    # §2 注：模型加载耗时单独披露，不进 latency_ms
+    stats: [mean, median, p95]
+
+# ---------------------------------------------------------------------------
+# §0.4-2 输入一致性与冻结面完整性
+# ---------------------------------------------------------------------------
+integrity:
+  text_sha256: true
+  md5_of_csv: true
+  md5sum_verify_after_read: true      # 读后复核 `md5sum -c` exit=0
+  access_log_required: true           # ACCESS_LOG.md 6 列
+
+# ---------------------------------------------------------------------------
+# §0.4-5 clean_test 对照声明（B3 的强项预期）
+# ---------------------------------------------------------------------------
+clean_test:
+  rows: 44
+  all_label: 1                        # 无负样本
+  fpr: undefined                      # §4.2：FPR 无定义
+  f1_degenerate: "2*TP/(2*TP+FN)"
+  expectation: "明文恶意对原始 Llama-Guard-3-1B **可见** ⇒ clean 集预期为 B3 的**强项**；与编码分片的弱势形成对照，这正是 Ours 要填补的缺口叙事"

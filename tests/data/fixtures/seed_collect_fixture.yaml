@@ -1,0 +1,89 @@
+# tests/data/fixtures/seed_collect_fixture.yaml
+# W3.1 单元测试用的**离线**配置：结构与 configs/data/seed_collect.yaml 一致，
+# 但路径指向 tests/data/fixtures/raw/，且把计数压到 6 + 2 = 8 条以便断言。
+#
+# 与真实配置的差异仅限「路径」与「计数」两处；字段语义、规则、字段序完全同构，
+# 以保证测试覆盖的是真实代码路径（尤其是阈值筛选、去重、抽样、group 分配）。
+seed_collect:
+  version: "fixture"
+
+  encoding: utf-8
+  newline: "\n"
+
+  output:
+    seeds_csv: seeds.csv
+    seeds_meta_json: seeds.meta.json
+    raw_acquisition_json: raw_acquisition.json
+    smoke_subdir: smoke
+
+  csv_fields:
+    - seed_id
+    - seed_group_id
+    - source
+    - harm_category
+    - severity
+    - raw_text
+    - source_item_id
+    - raw_file
+    - raw_sha256
+
+  id_prefix:
+    AgentHarm: AH
+    PKU-SafeRLHF: PKU
+
+  sources:
+    - name: AgentHarm
+      role: malicious_seed
+      hf_repo_id: ai-safety-institute/AgentHarm
+      hf_revision: FIXTURE-REVISION-AGENTHARM
+      mirror_endpoint: https://hf-mirror.com
+      license: other
+      raw_dir: AgentHarm
+      subset_rule:
+        strategy: full
+        description: "FIXTURE：取 behaviors 数组全部 6 条。"
+        file: AgentHarm/benchmark/harmful_behaviors_test_public.json
+        array_path: behaviors
+        expected_count: 6
+      field_map:
+        raw_text: prompt
+        source_item_id: id
+        harm_category: category
+        severity: null
+
+    - name: PKU-SafeRLHF
+      role: malicious_seed
+      hf_repo_id: PKU-Alignment/PKU-SafeRLHF
+      hf_revision: FIXTURE-REVISION-PKU
+      mirror_endpoint: https://hf-mirror.com
+      license: cc-by-nc-4.0
+      raw_dir: PKU-SafeRLHF
+      subset_rule:
+        strategy: severity_threshold
+        description: "FIXTURE：max(sev0, sev1) == 3 → 按 prompt 去重 → 抽样 2 条。"
+        files:
+          - PKU-SafeRLHF/data/Alpaca-7B/train.jsonl
+        threshold_expr: "max(response_0_severity_level, response_1_severity_level) == 3"
+        field: severity_level
+        aggregator: max
+        operator: "=="
+        value: 3
+        severity_scale: "0=harmless, 1=Minor, 2=Moderate, 3=Severe"
+        dedup_by: prompt
+        dedup_keep: first_occurrence
+        candidate_count_expected: 5
+        sample:
+          n: 2
+          seed: 42
+          method: "random.Random(seed).sample(candidates, n)"
+          sort_after_sample: file_order
+      harm_category_rule:
+        fields:
+          - response_0_harm_category
+          - response_1_harm_category
+        select: first_true_in_source_key_order
+        fallback: UNKNOWN
+      field_map:
+        raw_text: prompt
+        source_item_id: null
+        severity: derived

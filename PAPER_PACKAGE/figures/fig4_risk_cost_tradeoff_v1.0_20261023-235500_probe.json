@@ -1,0 +1,27 @@
+{
+  "png": "fig4_risk_cost_tradeoff_v1.0_20261023-235500.png",
+  "coord_origin": "top-left",
+  "style": "r8/D-180 §9.10B",
+  "ts": "20261023-235500",
+  "subscript_check": {},
+  "glyph_missing": {},
+  "points": [
+    "none (no detector)",
+    "b3 (Llama-Guard-3-1B)",
+    "Ours (v2)"
+  ],
+  "artifacts": [
+    {
+      "name": "fig4_risk_cost_tradeoff_v1.0_20261023-235500.png",
+      "sha256": "0252bf948e2bb2c36a697202e4aef52b4342b5aa6b29ad3c5dbb0ac8c134db83"
+    },
+    {
+      "name": "fig4_risk_cost_tradeoff_v1.0_20261023-235500.svg",
+      "sha256": "b5f795bd37a12641c142c9c50f961c9e28f302e814106e01f584683cedc41987"
+    },
+    {
+      "name": "fig4_risk_cost_tradeoff_v1.0_20261023-235500.pdf",
+      "sha256": "d48600a3fbb646bbac3983277c5629269614c5312aa593be99effcd47dddb6fe"
+    }
+  ]
+}

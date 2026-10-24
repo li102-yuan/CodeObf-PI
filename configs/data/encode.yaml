@@ -1,0 +1,73 @@
+# configs/data/encode.yaml — W3.3 编码变换管道配置
+#
+# 依 `windows/W3.3_encode.md` §3 与 `reports/data/stage2_plan_v1.0_20260930-184841.md` §0／§2。
+# 定值来源：`V-1`（改写体总数 440）、`V-5`（9 编码代码）、`V-6`（OOD 5/4 拆分）。
+#
+# ⚠ 一旦落盘即冻结：改本文件 = 改数据，须走 `DEVIATION_LEDGER.md`。
+#   与脚本的契约一致性由 `02_03_encode_variants.py` 启动时**双向校验**，不一致即非零退出。
+
+encode:
+  # --- 计数（`V-1`；禁止硬编码到脚本里，脚本从本文件读） ---
+  expected_rewrites: 440        # 父改写体数 = 440（`V-1`）
+  target_total: 3960            # 攻击样本（纯文本载体）= 440 × 9
+  carrier_type: text            # 本窗口恒 text；code 载体归 W3.4
+  label: 1                      # 攻击侧恒 1（恶意）
+
+  # --- `V-5` 9 编码；顺序即 `encoded.csv` 的行内展开顺序 ---
+  encodings:
+    - base64
+    - hex
+    - ascii_art
+    - rot13
+    - reverse
+    - morse
+    - url
+    - zerowidth
+    - homoglyph
+
+  # --- `difficulty` 取值域与映射（**本窗口定值**，须写入 `encode_report.json` 与 `DATA_CARD`） ---
+  #
+  # 定值判据（一句）：difficulty 由「**表层可还原性**」定档，与 OOD 拆分无关。
+  #   low    = 全部字符原样保留，人眼可直接还原（不含查表解码）
+  #   medium = 需一次标准解码且编码表公开可达（字符形态被替换，但解码是机械的）
+  #   high   = 视觉层或字符层被改写：需专用字形还原，或载荷对肉眼不可见
+  difficulty:
+    criterion: "low=字符原样保留可肉眼还原；medium=一次标准解码；high=需专用字形还原或肉眼不可见"
+    values: [low, medium, high]
+    map:
+      rot13: low
+      reverse: low
+      base64: medium
+      hex: medium
+      morse: medium
+      url: medium
+      ascii_art: high
+      zerowidth: high
+      homoglyph: high
+
+  # --- 可逆性校验（`D5`）---
+  roundtrip:
+    # 允许的失败率上限；实测必须为 0。阈值不放松，仅供断言表达式统一（`>=` 判失败）。
+    max_failure_rate: 0.0
+    # true = 不传 `--verify-roundtrip` 也做逐条校验（更严格）；`--verify-roundtrip` 额外打印逐条明细。
+    always_verify: true
+    # `homoglyph` 的不可逆条件（登记用；实测命中数须为 0，见 §7-2）
+    homoglyph_irreversibility_note: >-
+      本编码表按「每个源字符映射到唯一目标字符」设计，并对 `\\` 与目标字符本身做转义，
+      故映射**是单射**、解码**逐字符可逆**。唯一不可逆条件：载荷被第三方二次编辑
+      （删除转义用的反斜杠）。未登记任何不可逆率 —— 实测不可逆条数 0。
+
+  # --- 产物路径（相对 `--out`）---
+  output:
+    csv: encoded.csv
+    report_json: encode_report.json
+    smoke_subdir: smoke
+
+  # --- 上游输入缺省值 ---
+  inputs:
+    # 状态／危害类别不在 `rewrites.csv` 上，须回 `seeds.csv` 继承（group 级一一对应）
+    seeds: data/interim/seed_collect/seeds.csv
+    rewrites: data/interim/rewrite/rewrites.csv
+
+  # --- 报告中登记的自造示例（**不得使用真实恶意样本原文**）---
+  example_text: "hello"

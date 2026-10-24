@@ -1,0 +1,164 @@
+# =============================================================================
+# configs/train/curriculum.yaml — W5.2 课程学习与编码感知增强（**事前定值**）
+#
+# 依据（逐条可核）：
+#   - `windows/W5.2_curriculum.md` §3（课程学习冻结口径）／§4（增强冻结口径）
+#   - `PREREG_v1.md` §2（两套体制；5 训练码／4 留出码）／§9（QLoRA 与早停）
+#   - `data/frozen/CodeObf-PI_v1.0/DATA_CARD_CodeObf-PI_v1.0.md` §5（`difficulty` 封闭域与映射）
+#   - `SOURCE_LOCK/实验执行方案（最终版 v5）.md` L436–L438（课程学习与增强原文）
+#
+# **本文件是「事前定值」载体**：阶段切点是**固定 step 比例**，不由任何指标（含 val）触发。
+# 改本文件 = 改口径 ⇒ 须先写 `DEVIATION_LEDGER.md` 并呈 W0（`W5.2` §3-3／§8）。
+#
+# 冻结声明：本文件由 W5.2 起草；`W5.3`（3 seeds）起只读不改。
+# =============================================================================
+version: "v1.0"
+stage: "04"                 # `AGENTS.md` §4.6（04 = 阶段4 检测器微调）
+seq: "02"                   # 04_02
+window: "W5.2"
+permission: "A5"
+
+# -----------------------------------------------------------------------------
+# §1 难度与编码（`V-5` 封闭域；`DATA_CARD` §5 实算：high 2640／low 1760／medium 3520）
+# -----------------------------------------------------------------------------
+difficulty_levels: [low, medium, high]
+
+encoding_difficulty:
+  rot13: low
+  reverse: low
+  base64: medium
+  hex: medium
+  morse: medium
+  url: medium
+  ascii_art: high
+  zerowidth: high
+  homoglyph: high
+
+# -----------------------------------------------------------------------------
+# §2 两体制的编码域（`PREREG_v1.md` §2.1／§2.2）
+#   - 体制一：9 码全进训练，无留出码（故 `heldout_encodings` 为空表）
+#   - 体制二：训练侧恒 5 码；4 留出码在 train/val 的命中数必须 = 0（**一号门禁**）
+# -----------------------------------------------------------------------------
+regimes:
+  id:
+    label: "体制一（ID，同分布）"
+    train_encodings: [base64, hex, ascii_art, rot13, reverse, morse, url, zerowidth, homoglyph]
+    heldout_encodings: []           # 无留出码 ⇒ 门禁① 恒 0 命中（仍逐行实测并落报告）
+    scan_columns: [text, plaintext] # 与阶段2 的 `A5` 同制（`02_07.check_a5`）
+  ood:
+    label: "体制二（OOD，编码分布外）"
+    train_encodings: [base64, rot13, zerowidth, url, reverse]
+    heldout_encodings: [hex, morse, ascii_art, homoglyph]
+    scan_columns: [text, plaintext]
+
+# -----------------------------------------------------------------------------
+# §3 阶段计划（**累积式 3 阶段 ＋ 事前定值固定 step 比例**）
+#   - 累积式：后一阶段包含前一阶段的全部样本（理由：避免学新档忘旧档）
+#   - `step_proportions` 是**切点**，不是时长；边界 = floor(比例 × total_steps)
+#   - **禁止**用 val 指标触发切换（`W5.2` §3-3）；`total_steps` 由 `04_01` 训练时实测传入
+# -----------------------------------------------------------------------------
+plan:
+  n_stages: 3
+  cumulative: true
+  step_proportions: [0.3, 0.6, 1.0]
+  stages:
+    - stage: 1
+      levels: [low]
+      note: "体制一 = rot13／reverse；体制二 = rot13／reverse"
+    - stage: 2
+      levels: [low, medium]
+      note: "体制一 += base64／hex／morse／url；体制二 += base64／url"
+    - stage: 3
+      levels: [low, medium, high]
+      note: "体制一 += ascii_art／zerowidth／homoglyph；体制二 += zerowidth"
+  # 良性行 `difficulty` 恒为空（实测：体制一 train 良性 6336 行全为空、体制二 3910 行全为空）
+  # ⇒ 无难度梯度可排；若随阶段过滤会让 stage 1 只剩攻击行（正负比失衡且丢掉 safe 类）
+  # ⇒ 口径：**良性行恒入选**，阶段过滤只作用于攻击行。实测各阶段正负比落报告。
+  benign_always_included: true
+  # ---------------------------------------------------------------------------
+  # §3-1 良性子采样（**W5.2 补正轮，`D-42` 裁定三**；事前定值）
+  #
+  # 问题：良性行恒入选 ⇒ 各阶段正负比随攻击行档位收窄而**漂移约 5 倍**
+  #   （id 实测 0.2453／0.8177／1.2500），而 τ 是训练**结束后**在 val 上寻优的**单一固定值**
+  #   ⇒ 训练期决策先验漂移与固定 τ 不匹配，且违背 `V-4`「正负 ≈1:1」精神。
+  #
+  # W0 定的硬约束（`D-42` 裁定三；实现方式窗口自选）：
+  #   ① 各阶段子集正负比须**恒等于增强后训练帧的正负比**（id 1.2500／ood 1.1675），误差带 ±0.05；
+  #   ② **只减良性行**（不得删减攻击行，否则破坏累积式）；
+  #   ③ **stage 3 仍须等价于全量帧**；
+  #   ④ 规则事前定值（本处），确定性用 `random.Random(seed)`。
+  #
+  # 实现口径（唯一）：对每个阶段，**保留全部入选攻击行**（pos），把良性行（neg）子采样到
+  #   `neg_kept = round(pos_kept / target_ratio)`，并夹在 `[0, neg_total]`。
+  #   - `target_ratio` = **增强后训练帧实测正负比**（见下 `target_ratio_measured`）；不写死常数，
+  #     以避免与增强结果脱钩（自洽：stage 3 恒满足 `pos_frame/neg_frame == target_ratio`）。
+  #   - 子采样取**确定性前缀**（按行下标升序取前 `neg_kept` 个良性行）—— 不用随机洗牌，
+  #     使「同 seed 同输入 ⇒ 逐字节可复现」更强（比 `rng.sample` 更可核）；`rng` 仍按契约接收并用于校验。
+  # ---------------------------------------------------------------------------
+  benign_subsample:
+    enabled: true
+    # 目标正负比 = 增强后训练帧的正负比（**由 dry-run 实测回填**，非写死常数；见 target_ratio_measured）
+    target_ratio_source: "augmented_frame_measured"
+    target_ratio_measured:
+      id: 1.2500
+      ood: 1.1675
+    tolerance: 0.05               # `D-42` 裁定三：误差带 ±0.05
+    reduce_only: "benign"         # 只减良性行；攻击行一律不动（累积式不变）
+    stage3_equals_full_frame: true  # stage 3 必须等价全量帧（不可减）
+    deterministic: "prefix"       # 确定性前缀（按行下标升序），非随机洗牌
+    # 各阶段**允许的最小良性行数下限**（防止极端档位下良性被压到 0）：仅作安全断言。
+    min_benign_kept: 1
+  # dry-run 展示阶段边界时用的 total_steps 刻度（**只影响打印，不进训练**）：
+  # = W5.1 实测 4730 micro-batches/epoch × epochs 3 ÷ grad_accum 4 = 3547（探针
+  #   `reports/train/tmp/probe_len_dist.py`）。真实值由 `04_01` 按实际 micro-batches 传入。
+  dry_run_total_steps: 3547
+
+# -----------------------------------------------------------------------------
+# §4 编码感知增强（**追加式**；只作用于 train 分片且只作用于 `label == 1` 的攻击行）
+# -----------------------------------------------------------------------------
+augment:
+  enabled: true
+  p: 0.30                     # 抽中概率（事前定值；逐行 Bernoulli，显式 `random.Random(seed)`）
+  ratio_cap: 1.25             # 增强后 train 正负比（pos/neg）上界
+  form: "二次编码"            # 对现有 `payload` 再施加一种 allowed 编码（v5 L437「随机施加多种编码」）
+  exclude_self_encoding: true # 施加的编码不得与样本自身 `encoding_type` 相同（避免退化为恒等变换）
+  anchor_column: payload      # 替换锚点：`payload` 在 `text` 中的子串
+  anchor_missing_policy: skip # 锚点缺失（payload 不在 text 中）⇒ 跳过该行并计数（实测体制一 train 210/6336）
+  replace_all: true           # 锚点出现多次时全部替换（实测体制一 train 767 行 != 1 次）
+  augmented_difficulty: applied_encoding   # 增强行的 `difficulty`／`encoding_type` 取**所施加**编码
+  discard_order: [low, medium, high]       # 超上界时的缩减顺序（先丢 low，其次 medium）
+  discard_scope: augmented_only            # 只缩减**增强行**，原分片行一条不动
+  id_suffix_format: "{orig}__aug-{enc}"    # 增强行 `sample_id`（确定性；不与原 id 冲突）
+  mark_column: augmented                   # 增强行标记列（**不计入**跨检测器 `text_sha256` 校验，`W5.2` §4-6）
+  # 编码器出处：**复用** `scripts/data/02_03_encode_variants.py` 的 `ENCODERS`（`V-5` 单源），
+  # 不在本窗口自造编码（口径漂移风险）。
+  encoder_source: "scripts/data/02_03_encode_variants.py"
+
+# -----------------------------------------------------------------------------
+# §5 输入面与产物路径（C1／C11）
+#   A5 只读下列 4 个分片；**禁读** `data/sealed_test/**` 与 frozen 侧 `test.csv`（含表头）
+# -----------------------------------------------------------------------------
+paths:
+  frozen_splits: "data/frozen/CodeObf-PI_v1.0/splits"
+  allowed_splits:
+    - "regime_id/train.csv"
+    - "regime_id/val.csv"
+    - "regime_ood/train.csv"
+    - "regime_ood/val.csv"
+  forbidden_substrings:            # 命中即**非零退出**
+    - "sealed_test"
+    - "/test.csv"
+    - "\\test.csv"
+  default_report_dir: "reports/train"
+  default_log_dir: "logs/train"
+  artifacts:
+    report: "curriculum_v1.0_{ts}.md"
+    log: "04_02_train_curriculum_{ts}.log"
+
+# -----------------------------------------------------------------------------
+# §6 确定性（`W5.2` §5-6）
+# -----------------------------------------------------------------------------
+determinism:
+  rng: "random.Random(seed)"   # 显式实例，**不用全局 RNG**
+  seeds: [42, 123, 456]        # 与 `PREREG_v1.md` §1 同域
+  byte_reproducible: true      # 同 seed 同输入 ⇒ `augment_attack` 输出逐字节可复现

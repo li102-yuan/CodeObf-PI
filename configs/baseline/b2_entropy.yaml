@@ -1,0 +1,82 @@
+# configs/baseline/b2_entropy.yaml — W4.2 B2 熵值/字符分布基线的**分数定义冻结载体**（接口 v1.0）
+#
+# 冻结依据：`windows/W4.2_b2_entropy.md` §0.3（W4 冻结，随接口 v1.0）。
+# 本文件是 B2 **分数定义的唯一配置载体**，与 `windows/W4.6_unify.md` §2 schema／§4.1 配套。
+#
+# ⚠ 冻结纪律（`windows/W4.2_b2_entropy.md` §0.4-3）：
+#   **分数定义冻结于本 YAML，首次全量评估后不得改**；
+#   **禁止看测试分片的分数分布来改分数定义/参数**（测试分片只做最终评估一次）。
+#   §3 回退点：验证分片上 τ 寻优结果极差 ⇒ **如实报告**，**不得**为改善而事后改分数定义。
+#
+# 读取约定：脚本在函数体内惰性 `import yaml`，保证 `make check` 探针轻量。
+
+version: "1.0"
+detector: b2
+frozen_by: "windows/W4.2_b2_entropy.md §0.3"
+declared_at: "2026-10-03"          # 分数定义**事前定值**的落盘日期（先于任何全量评估）
+first_full_eval_at: "20261003-183739"   # **首次全量评估时间戳** —— 自此分数定义冻结（不随重跑改变）
+
+# ---------------------------------------------------------------------------
+# §0.3 主 score = **字符级 Shannon 熵**（对 `text` 的字符频率分布，以 bits 计）
+# ---------------------------------------------------------------------------
+score:
+  name: char_shannon_entropy
+  unit: bits
+  formula: "H = -Σ_c p_c · log2(p_c)，p_c = count(c) / len(text)，c 取 text 的**每个字符（Unicode 码位）**"
+  alphabet: unicode_codepoints      # 不按字节、不按 token；字符级
+  log_base: 2
+  input_column: text                # §1.2 原文直通：不 strip／不归一／不解码／不改大小写
+  empty_text_value: 0.0             # len(text)==0 时熵定义为 0（无字符可分布）
+  normalization: none               # **不**做长度归一化、不做最大值归一化（主 score 恒为原始 H）
+  direction: score_gt_tau_is_malicious   # v5 字面：熵超过阈值 = 恶意（编码串的字符熵高于自然语言）
+  threshold_tau:
+    applied_by: "03_07_unify_output_mapping.py"   # §4.1：τ 由 03_07 在验证分片按最优 F1 寻优
+    source: val_optimal_f1
+    tie_break: larger_tau
+    note: "**本窗口不施加 τ** —— 只产出 score"
+
+# ---------------------------------------------------------------------------
+# §0.3 附报（**可选**，非强制）：字符分布异常度
+# ---------------------------------------------------------------------------
+# v5 字面写作「熵值/字符分布」；主口径取**熵值**，字符分布异常度作敏感性附报。
+# 取「归一化熵」= H / log2(V)（V = text 中**不同字符数**）——**无需拟合参考分布**，
+# 因此不构成「用数据拟合阈值」，可与主口径并列披露。V<=1 时定义为 0.0。
+optional_report:
+  name: normalized_entropy
+  formula: "H / log2(V)，V = 不同字符数"
+  reporting_scope: validation_splits_only   # 只在 id_val／ood_val 上附报（测试分片不出分布）
+  mandatory: false
+
+# ---------------------------------------------------------------------------
+# §0.4 硬约束
+# ---------------------------------------------------------------------------
+constraints:
+  text_sha256: true                 # §1.4 输入一致性锚点（与 B1–B5 同一原文）
+  md5_of_csv: true                  # 逐分片冻结面完整性锚点
+  no_test_side_tuning: true         # 禁止看测试分片分数分布改定义/参数
+  clean_test_expectation: "明文恶意的熵与正常文本同量级 ⇒ B2 在 clean 集 TPR 预期接近 0；如实报告，属方法论边界（对照 §3.2 ASCII 艺术降级叙事同精神）"
+
+# ---------------------------------------------------------------------------
+# 输出（§1）：与 `windows/W4.6_unify.md` §2 schema 对齐
+# ---------------------------------------------------------------------------
+output:
+  directory: reports/baseline/outputs
+  filename: "b2_<split>_v1.0_<YYYYMMDD-HHMMSS>.csv"
+  raw_type: entropy                 # raw = {"entropy": <float>}
+  score: entropy                    # §2 score_source.b2 = entropy
+  pred: null                        # §2 注：**B2 的 pred 留空**，由 03_07 施加寻优后的 τ
+  auroc: computed_by_03_07          # §4.2：B2 有连续 score ⇒ AUROC 由 03_07 计算
+
+splits:
+  eval: [id_test, ood_test, clean_test]   # 三个测试分片
+  tau_search: [id_val, ood_val]           # 两个验证分片（data/frozen/ 侧，免 ACCESS_LOG）
+  all: [id_test, ood_test, clean_test, id_val, ood_val]
+
+# ---------------------------------------------------------------------------
+# 报告口径（§1）：**不含测试分片调参痕迹**
+# ---------------------------------------------------------------------------
+report:
+  distribution_summary_splits: [id_val, ood_val]   # 分数分布摘要**只在验证分片侧**出
+  latency_splits: all                              # 延迟按 §4.2 每分片都出
+  forbid_test_side_distribution: true              # 测试分片只出 n／md5／延迟，不出分布
+  forbid_test_side_tuning_trace: true

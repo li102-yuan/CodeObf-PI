@@ -1,0 +1,221 @@
+# configs/eval/external_baseline.yaml — W6.12（外部检测器基线 **B6**）**事前定值**载体
+#
+# 冻结依据：`windows/W6.12_external_baseline.md` §3（事前定值）／§4（接口契约）／§6（硬约束 C1–C10）；
+#          `PREREG_v1.10.md` §1（`P-M` = B6，**已由 `W1.1` 签署**，annotated tag `prereg-v1.10` → `a3d79ee`）；
+#          `DECISIONS.md` `D-151`（④ B 档范围五条＋红线五条）／`D-152`（签署后放行主表）。
+#
+# **性质**：本文件全部取值在**任何 B6 评测数字存在之前**写定（反事后择优）。
+# 实现期与评测期只能**读取**本文件、**不得按结果改写**；确需变更 ⇒ 停工呈 `W0`（`windows/W6.12_external_baseline.md` §9）。
+#
+# writer 侧禁令（与 `configs/eval/detection.yaml` 同制，不在本文件重复实现）：
+#  - `--report-dir`／`--outputs-dir` **不在此写死**（C9：由命令行给，脚本内不得硬编码 `reports/`）；
+#  - 分片路径**显式列举**（`--source sealed` 时按 `--split`＋`--regime` 解析，**禁止默认扫描**）。
+#
+# 读取约定：脚本在函数体内惰性 `import yaml`／`import torch`／`import transformers`，
+# 保证 `make check` 与 `--self-check` 轻量（顶层不 import 重型库，`AGENTS.md` §3）。
+
+version: "1.0"
+stage: "05"
+seq: "10"
+window: "W6.12"
+detector: b6
+detector_name: "B6 = Llama-Prompt-Guard-2-86M（**外部基线，非本项目训练**；只评测、不训练）"
+declared_at: "2026-10-22"
+declared_before: "任何 B6 评测数字存在之前（实现期零次触碰 data/sealed_test）"
+frozen_by: "windows/W6.12_external_baseline.md §3／§4／§6；PREREG_v1.10.md §1（P-M）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 复用单源（C6：不许自造读取或清洗；只调接口、不复制实现）
+# ─────────────────────────────────────────────────────────────────────────────
+modules:
+  eval_engine: "scripts/eval/05_01_eval_detection.py"        # assert_input_allowed／resolve_input_path／assert_record_count／read_records／latency_stats
+  preprocess: "scripts/baseline/03_06_unify_preprocess.py"   # load_samples（原文直通）／sha256_of／truncate_left（左截断单源）
+  mapping: "scripts/baseline/03_07_unify_output_mapping.py"  # compute_binary_metrics／binary_counts／auroc（指标单源）
+base_eval_config: "configs/eval/detection.yaml"              # 输入面白名单／record_assertions（1583／740／64）
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §1.1 身份与加载（唯一新增对比对象；越界即停工）
+# ─────────────────────────────────────────────────────────────────────────────
+model:
+  repo_id: "meta-llama/Llama-Prompt-Guard-2-86M"             # 86M 提示级二分类；BAGEL 论文骨架模型
+  modelscope_repo_id: "LLM-Research/Llama-Prompt-Guard-2-86M"  # HF 侧 gated=manual ⇒ 按 D-07 走魔搭镜像
+  hf_revision: "a8ded8e697ce7c355e395a0df51f94adb4a2fd27"    # 跨境复现锚点（魔搭 master 会漂移、不作锚点）
+  architectures: "DebertaV2ForSequenceClassification"        # 实测 config.json（**非** causal LM）
+  local_path: "D:/CodeObfPI_hf_cache/modelscope--LLM-Research--Llama-Prompt-Guard-2-86M"
+  local_files_only: true                                     # 禁止触网
+  commit_hashes: "models/commit_hashes/llama-prompt-guard-2-86m.json"   # 登记件（三处一致之三）
+  provenance: "D:/CodeObfPI_hf_cache/modelscope--LLM-Research--Llama-Prompt-Guard-2-86M/PROVENANCE.json"  # 逐文件 sha256（11 件 1,131,675,241 B）
+  role: "external_baseline_b6"                               # 非本项目训练；只评测不训练
+  runs: "单模型 × 1 次评测（无 3 seeds、无 6 run；不适用 Ours 的 run 轴）"
+
+load:
+  mode: fp32_native                    # 原生 dtype，不做量化（86M 无须 4bit-nf4）
+  dtype: float32
+  device: cuda
+  attn_implementation: eager           # 全阶段约定（ENV_LOCK.md §0.4／§6）
+  forbidden_attn: ["flash_attention_2", "sdpa"]
+  eval_mode: true                      # `model.eval()`（AGENTS.md §6-11）
+  no_grad: true                        # `torch.no_grad()` 硬断言
+  determinism:
+    cublas_workspace_config: ":4096:8" # **import torch 之前**设置（AGENTS.md §3）
+    cudnn_deterministic: true
+    cudnn_benchmark: false
+    allow_tf32: false
+  comparability_note: >-
+    与 B3/B5 的 4bit-nf4、B4 的 CPU 档**不同量纲** ⇒ 延迟/显存**只并列、不相减、不跨档排名**
+    （`PREREG_v1.10.md` §1.1 末行；`EVAL_REPORT.md` §6 不可比性声明同制）。
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §1.2 输入（原文直通；左截断口径）
+# ─────────────────────────────────────────────────────────────────────────────
+input:
+  column: text                         # `DATA_CARD` §3：唯一输入字段
+  pass_through: true                   # 同 `03_06`：不清洗／不归一／不改大小写
+  max_content_tokens: 512              # 模型侧统一输入规范：左截断、保尾部 512 **content** token
+  truncation_side: left                # `windows/W4.6_unify.md` §1.3 同向同长（B3/B5 同制）
+  special_tokens: "cls/sep 由 tokenizer 提供（[CLS]=1／[SEP]=2）；content ≤ 512 ⇒ 总长 ≤ 514"
+  roundtrip_guard: true                # `truncate_left` 的 decode→re-encode 往返会膨胀（实测多数回 513、个别 676）
+                                     # ⇒ 追加 **token 级 512 硬钳**（同向同长、计数披露、非静默兜底）
+  add_special_tokens: true             # 分类器需 [CLS]/[SEP]
+  quadratic_memory_note: >-
+    DeBERTa-v2 的 disentangled attention 偏置随序列长**平方**增长（实测 L≈3461 时单批需 ≈9.2 GB）⇒
+    **必须**截断到 ≤512 content token，否则 OOM；这也是「长输入未评」的原因（`EVAL_REPORT.md` §4）。
+  smoke_equivalence: true              # 每分片首条样本：未截断时校验「token 级构造 == tokenizer 原生构造」
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §1.2 判定口径分支（**只许择一**；本窗口取分支一 = 标签型）
+# ─────────────────────────────────────────────────────────────────────────────
+mapping:
+  kind: judgment                       # **分支一：标签/判词型**（模型卡 usage 自报 predicted_class_id）
+  kind_rejected: score                 # **分支二（连续打分型：原生阈值＋0.5 并列）未激活**：
+                                     # B6 实际落地为 argmax 标签型；启用分支二属新增口径，须新建 PREREG 版本
+  label_0: benign                      # 判 0
+  label_1: malicious                   # 判 1
+  rule: "pred = argmax(logits)（逐样本）；argmax=0 ⇒ pred=0（benign）；argmax=1 ⇒ pred=1（malicious）"
+  label_source: "模型卡 README usage 示例＋本机 smoke（恶意样本 argmax=1／良性 argmax=0）；config.json 无 id2label ⇒ **不得**用 model.config.id2label 的占位 LABEL_0/LABEL_1"
+  unparsed_policy: "content token 数 == 0（空 text／无法编码）⇒ `unparsed=1`、`pred` 留空、**计数并披露**，不得兜底为 0/1（C4：未解析不得当「安全」）"
+  score: null                          # 标签型 ⇒ 无连续 score（`score` 列留空）
+  auroc: "n/a"                         # 无连续 score ⇒ 不适用（**非缺失、非 0**）
+  span_f1: "n/a"                       # 无 span 输出 ⇒ 不适用
+  raw_column: "JSON：{logits:[l0,l1], argmax:k, label_name:...}（审计留痕；**不作为连续 score 使用**）"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §3 事前定值人群与指标（先写后跑；跑后不得改）
+# ─────────────────────────────────────────────────────────────────────────────
+population:
+  shards:                              # 显式列举（禁止默认扫描）
+    - {source: sealed, split: in_regime_test, regime: id,  assertion_key: regime_id_test,        expect_records: 1583}
+    - {source: sealed, split: in_regime_test, regime: ood, assertion_key: regime_ood_test,       expect_records: 740}
+    - {source: sealed, split: g3_hard_negative_test, regime: null, assertion_key: g3_hard_negative_test, expect_records: 64}
+  record_count_method: "csv.DictReader（严禁 readlines()/split(chr(10))；text 含换行 ⇒ 行数 ≫ 记录数，C8）"
+  on_mismatch: "nonzero_exit_and_stop_for_W0（禁改断言值）"
+
+metrics:
+  primary: [tpr, fpr, f1]
+  undefined_as: "n/a"                  # 无定义 ⇒ n/a（不适用），**不是** 0、也不是 <TBD>
+  auroc: "n/a"                         # 见 mapping.auroc
+  span_f1: "n/a"
+  source: "03_07.compute_binary_metrics（单源；与 BASELINE_REPORT §1 同口径）"
+  nan_rules:
+    tpr_undefined_when: "n_pos == 0（如 G3 全良性分片）"
+    fpr_undefined_when: "n_neg == 0"
+    f1_degenerate: "denom==0 ⇒ 0.0（03_07.f1_score，sklearn zero_division=0 同制）"
+  disclosure:
+    tpr_fpr_must_be_paired: true       # C5（`D-111` 裁定六）：FPR 与 TPR 必须并列
+
+latency:
+  excludes_model_load: true            # 不含模型加载
+  excludes_csv_io: true                # 不含 CSV 读写
+  includes: "批内 tokenize + forward 墙钟耗时"
+  monitor: per_batch                   # 计时单位 = 批；逐样本 = 批耗时 / 批大小（amortized）
+  batch_size: 32                       # 事前定值（不得按结果调整）
+  amortized_disclosure: "必须与 batch_size 一并披露；不得单独解读为单样本延迟"
+  stats: [mean_ms, median_ms, p95_ms]
+  source: "05_01.latency_stats（_quantile 单源）"
+
+memory:
+  collector: "torch.cuda.max_memory_allocated"
+  states: [load, infer]                # 加载态与推理态峰值分列
+  reset_between_states: true
+  unit: MiB
+  gpu_capacity_mib: 8188
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C6 封存访问守卫（`--source sealed` ⇔ 先登 ACCESS_LOG 6 列）
+# ─────────────────────────────────────────────────────────────────────────────
+access:
+  sealed_requires_note: true
+  access_log: "data/sealed_test/CodeObf-PI_v1.0/ACCESS_LOG.md"
+  access_log_columns: [date, window, purpose, command, output_path, reviewer]
+  note_min_chars: 20
+  missing_note_action: "refuse_and_nonzero_exit"
+  script_writes: false                 # 登记由人手工完成；脚本只在日志与报告回显 note
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C12 产物（只追加；LF；DictReader 记录数复核）
+# ─────────────────────────────────────────────────────────────────────────────
+outputs:
+  per_sample_fields:                   # 冻结 schema（`windows/W4.6_unify.md` §2）＋ B6 末尾追加列
+    - sample_id
+    - text_sha256
+    - pred
+    - raw_type
+    - raw
+    - score
+    - latency_ms
+    # ↓ B6 追加（置于末尾，不改既有列序）
+    - label
+    - n_content_tokens
+    - truncated
+    - unparsed
+  metric_fields:
+    - detector
+    - shard
+    - regime
+    - source
+    - kind
+    - n
+    - n_pos
+    - n_neg
+    - tp
+    - fp
+    - fn
+    - tn
+    - tpr
+    - fpr
+    - f1
+    - auroc
+    - span_f1
+    - latency_mean_ms
+    - latency_median_ms
+    - latency_p95_ms
+    - mem_load_peak_mib
+    - mem_infer_peak_mib
+    - eval_batch_size
+    - n_truncated
+    - n_unparsed
+    - roundtrip_guard_fired
+    - model_path
+    - config_path
+  raw_type: "logits"                   # B6 raw_type（JSON：logits + argmax + label_name）
+  per_sample_filename: "b6_<shard>_v1.0_<YYYYMMDD-HHMMSS>.csv"
+  report_filename: "external_baseline_v1.0_<YYYYMMDD-HHMMSS>.md"
+  metric_filename: "external_baseline_v1.0_<YYYYMMDD-HHMMSS>.csv"
+  outputs_subdir: "outputs_ext"        # **不得**进 outputs_v2/（那是 Ours v2 的）
+  newline: lf
+  append_only: true                    # 产物已存在 ⇒ 拒绝覆盖（FileExistsError）
+  encoding: utf-8
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 报告口径（必写段）
+# ─────────────────────────────────────────────────────────────────────────────
+report:
+  must_include:
+    - "B6 为**外部基线，非本项目训练**；只评测不训练"
+    - "加载 fp32 原生／device cuda／attn_impl=eager；与 B3/B5 的 4bit-nf4 **不同量纲**，延迟/显存只并列不相减"
+    - "判定映射 LABEL_0=benign／LABEL_1=malicious（argmax(logits)）；`config.json` 无 id2label，**不得**用占位 LABEL_0/LABEL_1"
+    - "AUROC／Span-F1 = **n/a**（不适用，非缺失、非 0）"
+    - "**只作描述性并列，不做显著性检验**（不入预注册三组 paired bootstrap；无 p 值、无 95% CI、无「显著」措辞）"
+    - "边界：只加一条外部基线、**未复现 BAGEL 全框架**（口径不可比）"
+    - "结果不利照实报告（C10）；G3 为全良性分片 ⇒ TPR n/a、只报 FPR"
+    - "长输入（512／2048 组）**未评**（DeBERTa-v2 二次注意力＋512 原生上下文，见 input.quadratic_memory_note）"

@@ -1,0 +1,20 @@
+{
+  "source": "AgentHarm",
+  "hf_repo_id": "ai-safety-institute/AgentHarm",
+  "hf_revision": "FIXTURE-REVISION-AGENTHARM",
+  "mirror_endpoint": "https://hf-mirror.com",
+  "fetch_cmd": "FIXTURE（离线夹具，无下载命令）",
+  "download_date": "2026-09-30",
+  "license": "FIXTURE-only",
+  "subset_rule": "FIXTURE 全量：取 behaviors 数组全部 6 条。",
+  "file_count": 1,
+  "total_bytes": 1981,
+  "files": [
+    {
+      "path": "benchmark/harmful_behaviors_test_public.json",
+      "bytes": 1981,
+      "md5": "910ba44c3cd746d99c4e2d75120d7edf",
+      "sha256": "aed53d9242a33235bc6c0e2d7dad20ff0ef4d1fd36c5f3c47f32e1a7d6ac2198"
+    }
+  ]
+}

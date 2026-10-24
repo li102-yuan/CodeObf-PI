@@ -1,0 +1,9 @@
+no,metric,v1,v2,source_01
+1,encoded-benign FPR (id pooled over 4 codes),82.62%,1.92%,C
+2,encoded-benign FPR (ood pooled over 4 codes),80.15%,21.34% (must cite hex 73.10%),C
+3,plaintext-attack TPR @ tau* (0/600),0.000,1.000,C
+4,tau* pinned runs (>=0.9975),5/6 (exception ood/seed123 0.6514),0/6 (6/6 inside 0.5312-0.9241),C
+5,pass rate sample-level true union (id),6/792 = 0.76%,19/792 = 2.40%,D
+6,pass rate sample-level true union (ood),93/352 = 26.42%,94/352 = 26.70%,D
+7,conditional ASR judgeable-only (ours),id 0.3333 (28) / ood 0.1712 (452),id 0.0164 (61) / ood 0.1048 (725),D (v1 base per D-164 ruling 1)
+8,final risk (Ours),id 0.0025 / ood 0.0452,id 0.0004 / ood 0.0280,D

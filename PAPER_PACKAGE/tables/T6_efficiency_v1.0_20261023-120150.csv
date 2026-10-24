@@ -1,0 +1,12 @@
+block,detector_or_item,load_tier,latency_ms,memory_mib,total_params,note
+6a ours-v2,latency mean,4bit-nf4 + cuda,133.96 - 162.04 (6-run range),--,--,batch-amortized (eval_max_size=16)
+6a ours-v2,latency median,4bit-nf4 + cuda,151.05 - 155.80,--,--,batch-amortized (eval_max_size=16)
+6a ours-v2,latency p95,4bit-nf4 + cuda,184.62 - 270.55 (6-run range; per-run id 236.1281/270.5513/184.6157, ood 224.0423/222.4426/184.8242 ms, seed 42/123/456),--,--,01 sG added by W0 (D-158); batch-amortized
+6a ours-v2,memory load,4bit-nf4 + cuda,--,1509.9 - 1541.9,--,max_memory_allocated
+6a ours-v2,memory inference,4bit-nf4 + cuda,--,4256.7,--,max_memory_allocated
+6a ours-v2,total params,4bit-nf4 + cuda,--,--,1498482688,safetensors metadata sum
+6a ours-v2,trainable params,4bit-nf4 + cuda,--,--,1703936 (LoRA r=16 alpha=32),best.json model_meta.trainable_params
+6b ours-v2,Ours (v2),4bit-nf4 + cuda,"133.96-162.04 / 151.05-155.80 / 184.62-270.55","1509.9-1541.9 / 4256.7",1498482688,batch=16; batch-amortized; grid-aligned with md 6b
+6b b6 external,B6 (external baseline),fp32 + cuda + eager,"48.708 / 48.466 / 56.131","1064.7 / 3929.9",not registered (no stated value in authority file; not computed),batch=32; single model single run; descriptive only
+6b b1-b2,B1 / B2,no model tier (non-neural),not applicable,not applicable,not applicable (non-neural detectors have no parameter tier),see BASELINE_REPORT s1
+6b b4,B4 unplug-tiny,CPU tier (different scale),512.00 / 261.45 / 856.76 (from BASELINE_REPORT s1),n/a (CPU; RSS 720.0 MiB),not applicable (not merged here),from BASELINE_REPORT s1; not merged not ranked

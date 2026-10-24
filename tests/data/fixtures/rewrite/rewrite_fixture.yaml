@@ -1,0 +1,63 @@
+# tests/data/fixtures/rewrite/rewrite_fixture.yaml
+# 测试夹具配置：**backend=template**（离线，绝不联网，绝不消耗 API 额度）。
+# 只固定被测逻辑需要的字段；与 configs/data/rewrite.yaml 同构但 N=4／target=8。
+rewrite:
+  target_total: 8
+  per_seed_min: 2
+  per_seed_max: 3
+  allocator: largest_remainder
+  seed: 42
+  backend: template
+  endpoint: https://api.deepseek.com
+  request_path: /chat/completions
+  model_id: deepseek-v4-pro
+  temperature: 0
+  top_p: 1
+  max_new_tokens: 512
+  timeout_seconds: 5
+  candidates_per_call: 3
+  max_retries: 3
+  template_model_id: rule-based-template-v1
+  prompt_template_sha256: "5142b0ab0365dc1be28f78fa8103cf6301f229b7ee4db27ba405972d12d504d7"
+  prompt_system_sha256: "4ca94ca17ca8544f90c228073a200642854c298f7234503df2e5ede2ba0a2276"
+  determinism_probe:
+    enabled: false
+    n_groups: 0
+  c3:
+    mode: introduced
+    min_b64_run: 20
+    min_hex_run: 16
+    pct_encoded_ratio_max: 0.30
+    forbidden_codepoints: ["​", "‌", "‍", "﻿"]
+    forbid_code_fence: true
+  min_rewrite_chars: 10
+  min_rewrite_chars_ratio: 0.3
+  max_rewrite_chars_ratio: 2.0
+  gate1:
+    sample_size: 3
+    pass_rate_threshold: 0.95
+    sampling: deterministic_equal_interval
+  csv_fields:
+    - rewrite_id
+    - seed_group_id
+    - seed_id
+    - rewrite_index
+    - text
+    - parent_text_sha256
+    - backend
+    - model_id
+    - request_id
+    - generated_at
+  gate1_fields:
+    - rewrite_id
+    - seed_group_id
+    - seed_text
+    - rewrite_text
+    - pass
+    - remark
+    - annotator
+  output:
+    rewrites_csv: rewrites.csv
+    gate1_sample_csv: intent_consistency_sample.csv
+    groups_subdir: _groups
+    smoke_subdir: smoke

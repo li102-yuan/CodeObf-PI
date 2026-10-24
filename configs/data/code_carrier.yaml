@@ -1,0 +1,77 @@
+# configs/data/code_carrier.yaml — W3.4 代码载体嵌入与 AST 校验配置
+#
+# 依 `windows/W3.4_code_carrier.md` §2／§3 与 `reports/data/stage2_plan_v1.0_20260930-184841.md` §0／§2。
+# 定值来源：`V-1`（440 × 9 × 2 = 7920，本窗口补 `code` 侧）、`V-7`（5 载体子型）。
+#
+# ⚠ 一旦落盘即冻结：改本文件 = 改数据，须走 `DEVIATION_LEDGER.md`。
+#   与脚本的契约一致性由 `02_04_embed_code_carrier.py` 启动时**双向校验**，不一致即非零退出。
+
+code_carrier:
+  # --- 计数（本窗口 1:1，不放大）---
+  expected_encoded: 3960        # 父编码变体数 = 440 × 9（`V-1`）
+  target_total: 3960            # 代码载体攻击样本 = 同上（`× 2` 的另一半即 `encoded.csv`）
+  carrier_type: code            # 本窗口恒 code
+  label: 1                      # 攻击侧恒 1（恶意）
+
+  # --- 门禁 2：AST 语法解析报错率 ---
+  # 阈值为预注册值，**不得放松**（`PREREG_v1.md` §5 补录 G4；v5 §2.4 门禁）。
+  # 放宽须走 `PROJECT_CONTRACT.md` §5；放宽不通过即回退 2.4 调模板，
+  # 必要时**降级优先保证纯文本载体**（且须呈报 W3，**不得自行改 `V-1`**）。
+  ast_gate: 0.10                # 报错率 ≤ 10%；分母**不含** javascript 行（ast_ok = -1）
+
+  # --- `V-7` 5 载体子型；顺序即子型分配时 sha256 取模的桶序 ---
+  subtypes:
+    - py_comment
+    - js_comment
+    - string_literal
+    - docstring
+    - identifier_ast
+
+  # --- 子型 → 语言（`js_comment` 唯一为 javascript；其余 python）---
+  language:
+    py_comment: python
+    js_comment: javascript
+    string_literal: python
+    docstring: python
+    identifier_ast: python
+
+  # --- 子型分配：确定性 ---
+  # sha256(sample_id) 前 12 位十六进制对 5 取模；主候选失败时按固定顺序换替补，
+  # 故 5 类均须出现（`E4`）且分配可复现。
+  assignment:
+    method: sha256_mod
+    hex_prefix_len: 12
+    rotate_on_failure: true
+
+  # --- 载荷完整性的判定口径（见 `E6`）---
+  # `payload_intact = 1` ⟺ `de_frame(text, subtype) == payload`（逐子型无损还原）。
+  # 不采用「连续子串」判据：多行载荷在注释载体中必然被逐行加前缀（`# `／`// `），
+  # 不可能成为连续子串，该判据下 E6 的 100% 不可达。
+  payload_intact:
+    method: de_frame_roundtrip
+    contiguity_reported_as_informational: true
+
+  # --- 不可执行性（`E7`）---
+  unexecutability:
+    method: inert_spans
+    # 惰性区间：注释 / 字符串字面量（含 docstring）/ 标识符
+    inert_kinds: [comment, string, identifier]
+    # 载荷行短于此长度时不做独立逐行补查（避免单字符噪声命中）
+    min_line_for_per_line_check: 3
+    # 宿主骨架自身须一个都不含；由脚本 import 时断言
+    # ⇒ text 中若出现这些片段，必定来自载荷，而载荷只在惰性区间内
+    forbidden_tokens: ["eval(", "exec(", "__import__(", "subprocess", "os.system"]
+
+  # --- 产物路径（相对 `--out`）---
+  output:
+    csv: code_carrier.csv
+    ast_report_csv: ast_report.csv
+    report_json: code_carrier_report.json
+    smoke_subdir: smoke
+
+  # --- 上游输入缺省值（只读）---
+  inputs:
+    encoded: data/interim/encoded/encoded.csv
+
+  # --- 报告中登记的自造示例（**不得使用真实恶意样本原文**）---
+  example_payload: "hello"

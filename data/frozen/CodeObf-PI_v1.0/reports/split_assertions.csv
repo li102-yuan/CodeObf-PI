@@ -1,0 +1,15 @@
+assertion_id,scope,description,threshold,measured,passed,evidence_path
+A1,attack,train/val/test 的 seed_group_id 集合两两交集为空,空集（两体制）,两体制的 train∩val／train∩test／val∩test 均为 0,True,split_assertions.csv
+A2,benign,benign_group_id 两两交集为空，且与攻击侧 group 空间不同源（前缀 SG- vs BG-）,空集,良性侧三档两两交集 0；攻击 group 220 个（SG-）∩ 良性 group 4440 个（BG-）=0,True,split_assertions.csv
+A3,regime_ood,体制二 train∪val 的 encoding_type ⊆ 5 训练编码,⊆ OOD_TRAIN,"非空 encoding_type 集合=['base64', 'reverse', 'rot13', 'url', 'zerowidth']；越界=无",True,split_assertions.csv
+A4,regime_ood,体制二 test 的 encoding_type ⊆ 4 留出编码,⊆ OOD_HELDOUT,"非空 encoding_type 集合=['ascii_art', 'hex', 'homoglyph', 'morse']；越界=无",True,split_assertions.csv
+A5,regime_ood,4 留出编码在体制二 train/val 中命中数 = 0（encoding_type 判定 + text/plaintext 两列内容扫描）,命中数 = 0,分类列命中=0；内容列命中=0（留出编码串 3520 个，扫描列 text/plaintext）,True,split_assertions.csv
+A6,global,rewrite_id 去重计数 = 440（改写体总数 = 440）,== 440,rewrite_id 去重计数 = 440（判据 == 440）,True,split_assertions.csv
+A7,global,sample_id 去重计数 = 7920（440 × 9 × 2 = 7920，两载体合并后去重）,== 7920,sample_id 去重计数 = 7920（判据 == 7920）,True,split_assertions.csv
+A8,global,每个 rewrite_id 恰有 9 编码 × 2 载体 = 18 条（体制一全视图）,== 18,"参与计数 rewrite_id=440；每 id 行数==18 者 440 个（不符 0 个）；载体集非 {text,code} 者 0 个",True,split_assertions.csv
+A9,cross,"每个分片内部 label 正负比 ∈ [0.8, 1.25]","[0.80, 1.25]","判定带=[0.80,1.25] regime_id/train=1.0000;regime_id/val=1.0000;regime_id/test=1.0013;regime_ood/train=0.9003;regime_ood/val=0.9035;regime_ood/test=0.9072",True,split_assertions.csv
+A10,cross,clean_original_test 的 group 集 ⊆ 测试 group 集，且其 text 与任一训练样本 text 不相等,⊆ 且 交集空,clean group=22，越出测试 group 集者=0；clean text 与 train∪val 相等者=0,True,split_assertions.csv
+A11,cross,g3_hard_negative_test 的 group 集 ⊆ 测试 group 集,⊆,g3 group=47，越出测试良性 group 集者=0,True,split_assertions.csv
+A12,global,代码载体样本 AST 报错率 ≤ 10%（复算，与门禁 2 同源）,≤ 0.10,ast_failed=0 / (ast_ok+ast_failed)=3152 ⇒ 报错率=0.000000（判据 ≤ 0.10）,True,data/interim/code_carrier/ast_report.csv
+A13,global,划分比例 V-3 = 8:1:1（group 级，split_seed=42），期望值由 seeds.meta.json 派生,== round(N×0.8) : round(N×0.1) : N−前两者,N=220 ⇒ 期望 176:22:22；实测 train=176、val=22、test=22（判据 tolerance_groups=0，等式）,True,split_assertions.csv
+A14,global,语义族跨档登记（报告性断言，非门禁）,n/a（无阈值）,跨 train↔test 族数=0/88；族内 3-gram 中位数=0.6328（n=1276 对） vs 跨族中位数=0.1899（n=95304 对）；比值=3.333；触发条件（字面）=成立（比值项：成立；跨档>0 且族内中位数>0.20：不成立）；**升级状态=**已生效（`family_atomic: true`；跨档族 = 0 ⇒ 无待办）****,n/a,family_straddle.csv

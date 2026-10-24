@@ -1,0 +1,143 @@
+# configs/data/seed_collect.yaml
+# W3.1 交付物 —— 种子收集配置（scripts/data/02_01_collect_seeds.py 的唯一配置入口）
+#
+# 依据：
+#   - reports/data/stage2_plan_v1.0_20260930-184841.md §2.1（标识符契约）、§2.2、§3（门禁 B1–B4）
+#   - windows/W3.1_seed_collect.md §2（原始数据获取）、§3（接口契约）
+#   - PREREG_v1.md §6（440 = 改写体总数 ⇒ 种子总数 N 必须落在 [147, 220]）
+#   - PREREG_v1.md §1（抽样种子 42）
+#   - DECISIONS.md D-28 裁定二（data/raw/ 由 W3.1 一次性写入，获取后即只读）、裁定三（V-3 已批准）
+#   - DECISIONS.md D-07 / D-11（渠道：huggingface.co 国内不可达，一律走 hf-mirror.com）
+#
+# 一旦落盘即冻结；任何改动视为改数据，须走 DEVIATION_LEDGER.md（仅追加）。
+#
+# ---------------------------------------------------------------------------
+# 种子总数 N = 220 的算术依据（本配置最重要的一条约束）
+# ---------------------------------------------------------------------------
+# PREREG_v1.md §6：改写体总数 = 440，由 W3.2「在全部来源种子上分配 2–3 条等价改写扩充到该总数」。
+# ⇒ per_seed_min × N ≤ 440 ≤ per_seed_max × N  ⇒  N ∈ [ceil(440/3), floor(440/2)] = [147, 220]
+# AgentHarm 全量 = 176 条（v5 §2.1 定值，实测该源 harmful_behaviors_test_public.json 恰为 176 条）
+# ⇒ PKU-SafeRLHF 入选上限 = 220 − 176 = 44 条。
+#
+# 取满上限 44 条（N=220）的理由：
+#   (1) 在硬预算内给 PKU 侧最大占比（44/220 = 20%），来源多样性最大；
+#   (2) N=220 时 440 / 220 = 恰为 2 ⇒ 每条种子恰 2 条改写，逐种子均等，
+#       消除 W3.2 §2 的 largest_remainder 分配带来的人为任意性；
+#   (3) 220 是 W3.2 开场词 §2 明示的可行上界。
+# ⚠ PKU 原始候选（severity_level == 3 去重后）实测 4658 条，远超上限 —— 故必须抽样，
+#   不得「全量入选」（那会使 N=4834，W3.2 直接非零退出）。抽样规则见 source.subset_rule.sample。
+# ---------------------------------------------------------------------------
+
+seed_collect:
+  version: "1.0"
+
+  # 落盘编码与行尾（V-9）：UTF-8 + LF，禁止孤立 CR
+  encoding: utf-8
+  newline: "\n"
+
+  output:
+    seeds_csv: seeds.csv
+    seeds_meta_json: seeds.meta.json
+    raw_acquisition_json: raw_acquisition.json
+    smoke_subdir: smoke
+
+  # 字段顺序固定（stage2_plan §2.1 契约；不得增删、不得换序）
+  csv_fields:
+    - seed_id
+    - seed_group_id
+    - source
+    - harm_category
+    - severity
+    - raw_text
+    - source_item_id
+    - raw_file
+    - raw_sha256
+
+  # seed_id 前缀（SEED-<src>-<nnn>，三位零填）
+  id_prefix:
+    AgentHarm: AH
+    PKU-SafeRLHF: PKU
+
+  sources:
+    # -----------------------------------------------------------------------
+    - name: AgentHarm
+      role: malicious_seed
+      hf_repo_id: ai-safety-institute/AgentHarm
+      hf_revision: e23b3fe60a0da9037314b88e5ee3a0c054970dad
+      mirror_endpoint: https://hf-mirror.com
+      license: other
+      raw_dir: AgentHarm  # 相对 data/raw/
+
+      subset_rule:
+        strategy: full
+        description: >
+          全量入选：取 harmful_behaviors_test_public.json 的 behaviors 数组全部条目。
+          v5 §2.1 定 176 条，本配置以 expected_count 校验实算值；不等即非零退出
+          （windows/W3.1_seed_collect.md §2.1：「若实际条目数 ≠ 176，以实际为准并记入 DATA_CARD」
+           —— 但经实测该文件恰为 176 条，故此处改为硬校验，实测不符即报错并呈报 W3）。
+        file: AgentHarm/benchmark/harmful_behaviors_test_public.json
+        array_path: behaviors
+        expected_count: 176
+        # 未选用：benchmark/harmful_behaviors_validation.json（32 条，另一 split）
+        # 理由：v5 §2.1 的 176 与 test_public 文件实测条数逐字吻合，validation 属另一评测集。
+
+      field_map:
+        raw_text: prompt
+        source_item_id: id
+        harm_category: category
+        severity: null      # AgentHarm 无严重度字段 ⇒ 落空串（§3.1）
+
+    # -----------------------------------------------------------------------
+    - name: PKU-SafeRLHF
+      role: malicious_seed
+      hf_repo_id: PKU-Alignment/PKU-SafeRLHF
+      hf_revision: 9421ffafec3fa40a1f1a7d567b4d525079477ecb
+      mirror_endpoint: https://hf-mirror.com
+      license: cc-by-nc-4.0
+      raw_dir: PKU-SafeRLHF
+
+      subset_rule:
+        strategy: severity_threshold
+        description: >
+          高严重度筛选：对每条记录取 max(response_0_severity_level, response_1_severity_level)，
+          保留该值 == 3（Severe）的记录；随后按 prompt 文本去重（保留首次出现）；
+          最后在去重候选上做确定性抽样取 sample.n 条。
+        files:  # 相对 data/raw/，顺序即确定性扫描顺序
+          - PKU-SafeRLHF/data/Alpaca-7B/train.jsonl
+          - PKU-SafeRLHF/data/Alpaca-7B/test.jsonl
+          - PKU-SafeRLHF/data/Alpaca2-7B/train.jsonl
+          - PKU-SafeRLHF/data/Alpaca2-7B/test.jsonl
+          - PKU-SafeRLHF/data/Alpaca3-8B/train.jsonl
+          - PKU-SafeRLHF/data/Alpaca3-8B/test.jsonl
+        # —— 阈值原文（写入 raw_acquisition.json 与 seeds.meta.json 的 subset_rule）——
+        threshold_expr: "max(response_0_severity_level, response_1_severity_level) == 3"
+        field: severity_level
+        aggregator: max
+        operator: "=="
+        value: 3
+        severity_scale: "0=harmless, 1=Minor, 2=Moderate, 3=Severe（来源 README「Severity Level」节）"
+        dedup_by: prompt
+        dedup_keep: first_occurrence
+        candidate_count_expected: 4658   # 实测值，硬校验；不符即非零退出并呈报
+
+        # 确定性抽样：random.Random(seed).sample(candidates, n)
+        # 抽取「成员集合」后按文件序排序落盘 ⇒ 产物只依赖成员集合，不依赖 sample 的返回顺序
+        sample:
+          n: 44
+          seed: 42          # PREREG_v1.md §1：抽样使用 42 / 123 / 456
+          method: "random.Random(seed).sample(candidates, n)"
+          sort_after_sample: file_order
+
+      # 危害类别：对 severity == max 的那些 response 取 harm_category 字典中值为 True 的类别，
+      # 按来源字典自身的键序（S1→S19）取第一个 ⇒ 单值，与 AgentHarm 侧语义对齐。
+      harm_category_rule:
+        fields:
+          - response_0_harm_category
+          - response_1_harm_category
+        select: first_true_in_source_key_order
+        fallback: UNKNOWN
+
+      field_map:
+        raw_text: prompt
+        source_item_id: null   # 来源无行 id ⇒ 由脚本按 "<variant>/<split>.jsonl#L<lineno>" 合成
+        severity: derived      # 由 aggregator 派生为十进制字符串

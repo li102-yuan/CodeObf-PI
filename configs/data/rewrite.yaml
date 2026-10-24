@@ -1,0 +1,113 @@
+# configs/data/rewrite.yaml — W3.2 语义改写扩充配置
+#
+# 依据：windows/W3.2_rewrite.md §2（字段与定值）、PREREG_v1.md §5/§6（V-1、门禁 1）、
+#       reports/data/stage2_plan_v1.0_20260930-184841.md §0（V-1）与 §10（V-10、X-3）。
+#
+# ⚠ 本文件**一旦落盘即冻结**（windows/W3.2_rewrite.md §2）：
+#   改配置 = 改数据。任何改动须走 DEVIATION_LEDGER.md（工程性）或 W0 批准（重大）。
+#
+# 冻结指纹：本文件 sha256 由 02_01／02_02 写入各自 meta/report；改动可据此追溯。
+
+rewrite:
+  # ---- 定值（V-1，硬约束）----------------------------------------------
+  target_total: 440              # V-1：改写体总数，硬约束。产出计数 ≠ 440 ⇒ 非零退出
+  per_seed_min: 2                # v5 §2.2：每条种子 2–3 条
+  per_seed_max: 3
+
+  # ---- 分配 --------------------------------------------------------------
+  # N 从 <seeds 目录>/seeds.meta.json 的 seed_count_total 读（W-10-②，禁止硬编码）。
+  # 实测 N = 220 ⇒ 2N = 440 恰中 ⇒ 每组恒 2 条（V-10）。allocator 保留最大余数法实现
+  # 供 N 变动时复用；但脚本级要求 per_seed_min × N == target_total，
+  # 2N ≠ 440 时**报错退出**，不自动给部分组补 3 条（§2 配套约束）。
+  allocator: largest_remainder
+  seed: 42                       # 本窗口无随机过程；此字段仅记录分配器所用确定性次序约定
+
+  # ---- 生成后端：二选一，显式声明，不得两套混用同一条样本（§3.2）---------
+  # api      = 首选，改写质量；走 https://api.deepseek.com，key 从 DEEPSEEK_API_KEY 读（禁落盘）
+  # template = 离线兜底，规则化句式改写；按 §3.2 ⑥ 须先在 10 条种子上人工核对通过再跑全量
+  backend: api
+  endpoint: https://api.deepseek.com
+  request_path: /chat/completions
+  model_id: deepseek-v4-pro      # ENV_LOCK.md §5.1 实测本账户可用 id（D-08 A）
+  temperature: 0                 # 确定性优先；若 API 不支持完全确定性，须在报告中声明并记录差异率
+  top_p: 1
+  # ⚠ 4096，**不是** windows/W3.2_rewrite.md §2 模板里的 512。
+  # 原因：deepseek-v4-pro 是**推理模型**，`reasoning_tokens` 计入 `completion_tokens`。
+  # 实测 512 时全部预算被推理吃光、`content` 为空（finish_reason=length）；单组推理实测
+  # 173–1847 tokens。只对实际 emit 的 token 计费，故抬高上限是**廉价的保险**。
+  # 已记入 DEVIATION_LEDGER.md（工程性）。reasoning_tokens 逐次入日志与报告 §1。
+  max_new_tokens: 4096
+  timeout_seconds: 120
+  candidates_per_call: 3         # 每组一次调用取 3 条候选，保留通过的 2 条（C3 留有余量）
+  max_retries: 3                 # 组级重生成上限（§4.2 C3：命中即重生成）
+  template_model_id: rule-based-template-v1   # backend=template 时写进 model_id 列
+
+  # 改写 prompt 模板的 sha256（UTF-8 + LF）。
+  # 须与脚本内 PROMPT_TEMPLATE 逐字节一致；不一致 ⇒ 02_02 非零退出。
+  # 复算：python scripts/data/02_02_rewrite_semantics.py --print-template-sha256
+  prompt_template_sha256: "5142b0ab0365dc1be28f78fa8103cf6301f229b7ee4db27ba405972d12d504d7"
+
+  # role=system 任务说明的 sha256（脚本内 PROMPT_SYSTEM）。加它是为消除**误拒**：
+  # 不加时 SG-0165 等种子被 deepseek-v4-pro 直接拒答（实测证据见运行报告 §3.3）。
+  # 它不是越狱话术：只陈述本任务的真实事实（输入取自公开红队基准、输出是检测器训练
+  # 用的数据集行、改写是机械变换）。全文内联于运行报告 §5.1。
+  # 复算：python scripts/data/02_02_rewrite_semantics.py --print-template-sha256
+  prompt_system_sha256: "4ca94ca17ca8544f90c228073a200642854c298f7234503df2e5ede2ba0a2276"
+
+  # ---- 确定性复测（§3.2 ②）----------------------------------------------
+  determinism_probe:
+    enabled: true
+    n_groups: 3                  # 同一输入连续两次调用，记录输出差异率
+
+  # ---- C3：编码形态检测（§4.2）------------------------------------------
+  c3:
+    # mode 二选一：
+    #   literal    = 逐字实现 §4.2（对 text 扫五类形态，命中即拒）
+    #   introduced = 只在「命中片段未在父种子中出现过」时拒（即只拒改写器**新引入**的形态）
+    # 取 introduced 的理由见脚本模块 docstring 与运行报告 §3.1：seeds.csv 220 条中
+    # 24 条（10.9%）**天然含**长字母数字串（路径、虚构凭据），而改写要求逐字保留具体细节
+    # ⇒ 逐字口径下这些组必然全候选被拒、无法凑满 V-1 的 440。两种口径的计数**都**入报告。
+    mode: introduced
+    min_b64_run: 20              # 长度 ≥ 20 的连续 [A-Za-z0-9+/=] 串
+    min_hex_run: 16              # 连续十六进制串 ≥ 16
+    pct_encoded_ratio_max: 0.30  # %XX 覆盖率 = 3×命中数/文本长度；> 0.30 判污染
+    forbidden_codepoints: ["​", "‌", "‍", "﻿"]  # U+200B/U+200C/U+200D/U+FEFF
+    forbid_code_fence: true      # 三反引号代码围栏
+
+  # ---- 候选质检护栏（辅助「不得弱化」，与 C3 并列记录拒绝原因）------------
+  min_rewrite_chars: 20
+  min_rewrite_chars_ratio: 0.3   # 改写体长度 / 父种子长度 下限（低于即疑为内容丢失）
+  max_rewrite_chars_ratio: 2.0   # 上限（高于即疑为灌水）
+
+  # ---- 门禁 1（PREREG_v1.md §5 补录 G4）----------------------------------
+  gate1:
+    sample_size: 50              # --sample-gate 的配置侧缺省；命令行可覆盖
+    pass_rate_threshold: 0.95
+    # 抽样**确定性**（非随机）：按 rewrite_id 升序后等距抽样 round(i*(M-1)/(K-1))
+    sampling: deterministic_equal_interval
+
+  # ---- 输出 --------------------------------------------------------------
+  csv_fields:
+    - rewrite_id
+    - seed_group_id
+    - seed_id
+    - rewrite_index
+    - text
+    - parent_text_sha256
+    - backend
+    - model_id
+    - request_id
+    - generated_at
+  gate1_fields:
+    - rewrite_id
+    - seed_group_id
+    - seed_text
+    - rewrite_text
+    - pass
+    - remark
+    - annotator
+  output:
+    rewrites_csv: rewrites.csv
+    gate1_sample_csv: intent_consistency_sample.csv
+    groups_subdir: _groups       # 断点续跑缓存：每组一个 JSON
+    smoke_subdir: smoke
